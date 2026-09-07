@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "fiken:test": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/fiken-test.ts"
+    "fiken:test": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/fiken-test.ts",
+    "rls:test": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/rls-test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
@@ -18,6 +19,7 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "resend": "^4.1.2",
+    "server-only": "^0.0.1",
     "zod": "^3.24.1"
   },
   "devDependencies": {
