@@ -71,15 +71,27 @@ notisen/
 │   ├── globals.css
 │   └── api/
 │       ├── fiken/suppliers/route.ts # GET – henter leverandører fra Fiken
-│       └── cron/reminders/route.ts  # daglig cron – sender e-postvarsler
+│       └── cron/
+│           ├── reminders/route.ts   # daglig cron 07:00 – sender e-postvarsler
+│           └── maintenance/route.ts # daglig cron 04:00 – opprydding / sikkerhetsnett
 ├── lib/
 │   ├── fiken.ts                     # Fiken API-klient (kun server)
 │   ├── env.ts                       # miljøvariabler ett sted
+│   ├── reminders.ts                 # varsel-logikk (server-only-fri, testbar)
+│   ├── contract-maintenance.ts      # opprydds-logikk (server-only-fri, testbar)
+│   ├── contract-extract-run.ts      # delt uttrekksflyt (route + cron)
+│   ├── delete-contract.ts           # slett kontrakt: rad + PDF
+│   ├── email.ts                     # Resend-utsending (lazy klient)
 │   └── supabase/
 │       ├── server.ts               # Supabase-klient med brukersesjon (RLS)
 │       └── admin.ts                # service role-klient (kun cron/admin)
 ├── scripts/
-│   └── fiken-suppliers.mjs          # frittstående connectivity-test
+│   ├── fiken-test.ts                # frittstående Fiken connectivity-test
+│   ├── rls-test.ts                  # npm run rls:test
+│   ├── storage-rls-test.ts          # npm run storage-rls:test
+│   ├── deadline-test.ts             # npm run deadline:test
+│   ├── reminders-test.ts            # npm run reminders:test
+│   └── delete-contract-test.ts      # npm run delete-contract:test
 ├── supabase/
 │   └── schema.sql                   # tabeller + Row Level Security
 ├── docs/

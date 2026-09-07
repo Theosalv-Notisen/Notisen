@@ -1,0 +1,43 @@
+import { NextResponse } from "next/server";
+import { env } from "@/lib/env";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { runMaintenance } from "@/lib/contract-maintenance";
+import { runExtraction } from "@/lib/contract-extract-run";
+
+/**
+ * GET /api/cron/maintenance
+ *
+ * Kjøres av Vercel Cron (se vercel.json), én gang i døgnet. Sikkerhetsnett:
+ *   - kjører fastlåste uttrekk på nytt
+ *   - rydder forlatte drafts (rad + PDF)
+ *   - logger foreldreløse storage-filer (sletter ikke – ennå)
+ *
+ * Kjører med service role (admin-klient) og går forbi RLS – all filtrering
+ * ligger eksplisitt i `runMaintenance`.
+ */
+export const maxDuration = 300;
+
+export async function GET(request: Request) {
+  // Hent secret defensivt: mangler den, svarer vi 401 (ikke 500).
+  const secret = env.cronSecretOptional();
+  const auth = request.headers.get("authorization");
+  if (!secret || auth !== `Bearer ${secret}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const supabase = createAdminClient();
+    const summary = await runMaintenance({
+      supabase,
+      now: new Date(),
+      runExtraction,
+    });
+    return NextResponse.json({ ok: true, ...summary });
+  } catch (err) {
+    console.error("Maintenance-cron feilet uventet:", err);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 },
+    );
+  }
+}

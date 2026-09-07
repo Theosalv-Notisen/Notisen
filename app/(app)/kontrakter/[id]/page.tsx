@@ -10,6 +10,7 @@ import {
 } from "@/lib/contract-status";
 import { confirmContract } from "../actions";
 import { ExtractControls } from "./extract-controls";
+import { DeleteButton } from "./delete-button";
 
 export const dynamic = "force-dynamic";
 
@@ -69,10 +70,10 @@ export default async function KontraktDetaljPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ bekreftet?: string; justert?: string }>;
+  searchParams: Promise<{ bekreftet?: string; justert?: string; feil?: string }>;
 }) {
   const { id } = await params;
-  const { bekreftet, justert } = await searchParams;
+  const { bekreftet, justert, feil } = await searchParams;
   await requireUser(`/kontrakter/${id}`);
 
   const supabase = await createClient();
@@ -135,6 +136,13 @@ export default async function KontraktDetaljPage({
         <p className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
           Noen felt ble justert ved lagring: {justert}. Sjekk verdiene og lagre
           på nytt om noe ble feil.
+        </p>
+      ) : null}
+
+      {feil === "slett" ? (
+        <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+          Klarte ikke slette kontrakten. Den finnes kanskje ikke lenger, eller du
+          har ikke tilgang til den.
         </p>
       ) : null}
 
@@ -303,6 +311,20 @@ export default async function KontraktDetaljPage({
           </form>
         </>
       ) : null}
+
+      {/* ── Faresone ──────────────────────────────────────────────── */}
+      <section className="mt-16 border-t border-red-500/20 pt-6">
+        <h2 className="text-sm font-semibold text-red-700 dark:text-red-300">
+          Faresone
+        </h2>
+        <p className="mt-1 text-xs opacity-60">
+          Sletting fjerner kontrakten, PDF-en og alle planlagte påminnelser
+          permanent. Dette kan ikke angres.
+        </p>
+        <div className="mt-3">
+          <DeleteButton contractId={c.id} />
+        </div>
+      </section>
     </div>
   );
 }

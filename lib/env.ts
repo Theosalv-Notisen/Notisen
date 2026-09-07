@@ -34,6 +34,12 @@ export const env = {
   resendApiKey: () => required("RESEND_API_KEY"),
   reminderFromEmail: () => optional("REMINDER_FROM_EMAIL") ?? "varsel@notisen.no",
 
+  /**
+   * Basis-URL for appen, brukt til å bygge lenker i e-post o.l.
+   * Server-side (ikke NEXT_PUBLIC_). Faller tilbake til lokal dev-URL.
+   */
+  appUrl: () => optional("APP_URL") ?? "http://localhost:3000",
+
   cronSecret: () => required("CRON_SECRET"),
   /** Som cronSecret(), men kaster ikke – brukes der vi vil svare 401 selv om variabelen mangler. */
   cronSecretOptional: () => optional("CRON_SECRET"),

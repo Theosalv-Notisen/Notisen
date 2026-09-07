@@ -26,6 +26,14 @@ export const STATUS_LABEL: Record<ContractStatus, string> = {
  */
 export const STALE_PROCESSING_MS = 5 * 60 * 1000;
 
+/**
+ * Terskel for opprydds-cronen: hvor lenge en kontrakt får stå i
+ * 'uploaded'/'processing' før cronen regner den som fastlåst og kjører
+ * tolkningen på nytt. Romsligere enn STALE_PROCESSING_MS fordi cronen kun er
+ * et sikkerhetsnett for kontrakter ingen ser på i UI-en.
+ */
+export const STALE_PROCESSING_CRON_MS = 15 * 60 * 1000;
+
 /** True hvis kontrakten har stått i `processing` uten oppdatering for lenge. */
 export function isStuckProcessing(
   updatedAt: string | null | undefined,

@@ -29,11 +29,24 @@ Beregn next_deadline
 Dashboard: liste sortert på next_deadline, med nedtelling (dager igjen)
         │
         ▼
-Vercel Cron (daglig 07:00)  ──►  /api/cron/reminders
-   for offset in [90, 60, 30]:
-       finn kontrakter der next_deadline == today + offset
-       og (contract_id, offset, deadline) ikke finnes i reminder_log
-       ──►  send e-post (Resend)  ──►  skriv reminder_log
+Vercel Cron (daglig 07:00)  ──►  /api/cron/reminders   (lib/reminders.ts)
+   hent kontrakter: status='confirmed', needs_review=false,
+       next_deadline mellom i dag og i dag+90 (Europe/Oslo)
+   per kontrakt:
+       daysLeft   = next_deadline − i dag
+       applicable = [90,60,30].filter(o => daysLeft <= o)   (terskel, ikke eksakt dag)
+       mostUrgent = min(applicable)
+       per offset i applicable:
+           INSERT reminder_log (contract_id, offset, deadline)   ← unik-constraint = idempotens
+           unik-brudd            ──►  hopp over (allerede sendt)
+           offset == mostUrgent  ──►  send e-post (Resend); feiler den: slett logg-raden (retry neste kjøring)
+           ellers                ──►  stille backfill-rad, ingen e-post
+
+Vercel Cron (daglig 04:00)  ──►  /api/cron/maintenance   (lib/contract-maintenance.ts)
+   1. fastlåste uttrekk (status uploaded/processing, updated_at eldre enn 15 min)
+      ──►  runExtraction(force) på maks 3 per kjøring   (lib/contract-extract-run.ts)
+   2. forlatte drafts (status 'draft', created_at eldre enn 2 t)  ──►  slett rad + PDF
+   3. foreldreløse storage-filer  ──►  LOGG-ONLY ("orphan: <sti>"), sletter ikke ennå
 ```
 
 ## "Gjentakende bilag" fra Fiken
@@ -55,7 +68,12 @@ Det vi kan gjøre:
   Når auth er på plass: hent token fra `fiken_connection` for innlogget bruker.
 - Service role-nøkkelen brukes kun i `/api/cron/*`. Aldri importer
   `lib/supabase/admin.ts` i en vanlig bruker-route.
-- Cron-endepunktet er beskyttet av `CRON_SECRET` i Authorization-header.
+- Cron-endepunktene er beskyttet av `CRON_SECRET` i Authorization-header
+  (mangler secret → 401, aldri 500).
+- Cron går forbi RLS: `lib/reminders.ts` og `lib/contract-maintenance.ts` har
+  derfor all status-/eierskaps-filtrering eksplisitt i spørringene. Begge er
+  `server-only`-frie og tar avhengigheter inn som parametre, så
+  `scripts/reminders-test.ts` kan kjøre logikken direkte mot databasen.
 
 ## Neste steg (rekkefølge)
 

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { computeNextDeadline } from "@/lib/contract-deadline";
+import { deleteContractById } from "@/lib/delete-contract";
 import {
   normalizeBoolean,
   normalizeDate,
@@ -120,4 +121,28 @@ export async function confirmContract(formData: FormData) {
     query.set("justert", adjustments.join(" | "));
   }
   redirect(`/kontrakter/${id}?${query.toString()}`);
+}
+
+/**
+ * Sletter en kontrakt permanent (rad + PDF + planlagte påminnelser via cascade).
+ * Bruker-scoped klient, så RLS sørger for at man bare kan slette egne rader.
+ * Fant vi ingen rad å slette → tilbake til detaljsiden med ?feil=slett.
+ */
+export async function deleteContract(formData: FormData) {
+  const id = emptyToNull(formData.get("id"));
+  if (!id) throw new Error("Mangler kontrakt-id.");
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect(`/login?next=/kontrakter/${id}`);
+
+  const { deleted } = await deleteContractById(supabase, user.id, id);
+  if (!deleted) {
+    redirect(`/kontrakter/${id}?feil=slett`);
+  }
+
+  revalidatePath("/kontrakter");
+  redirect("/kontrakter");
 }
