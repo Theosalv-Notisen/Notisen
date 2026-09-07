@@ -136,10 +136,32 @@ export async function POST(request: Request) {
       );
     }
 
-    await supabase
+    const { error: statusErr } = await supabase
       .from("contract")
       .update({ status: "uploaded", updated_at: new Date().toISOString() })
       .eq("id", contractId);
+
+    if (statusErr) {
+      // PDF-en ligger nå i storage, men raden henger på 'draft'. Rydd opp
+      // (best effort) så en ny opplasting ikke etterlater en foreldreløs fil –
+      // samme strategi som når selve opplastingen feiler over. Enkleste
+      // holdbare valg: tilbake til ren pre-opplasting-tilstand, bruker prøver på nytt.
+      try {
+        await supabase.storage.from("contracts").remove([storagePath]);
+      } catch (cleanupErr) {
+        console.error("Klarte ikke rydde storage etter statusfeil:", cleanupErr);
+      }
+      try {
+        await supabase.from("contract").delete().eq("id", contractId);
+      } catch (cleanupErr) {
+        console.error("Klarte ikke slette contract-rad etter statusfeil:", cleanupErr);
+      }
+      console.error("Klarte ikke sette status=uploaded:", statusErr);
+      return NextResponse.json(
+        { error: "Klarte ikke fullføre opplastingen. Prøv igjen." },
+        { status: 502 },
+      );
+    }
 
     return NextResponse.json({ contractId });
   } catch (err) {

@@ -8,26 +8,46 @@ import { useRouter } from "next/navigation";
  *
  * - "run"        : kontrakten er lastet opp, ikke tolket → "Kjør uttrekk"
  * - "retry"      : forrige forsøk feilet → "Prøv igjen" (force=1)
- * - "processing" : tolkning pågår → oppdaterer siden hvert 4. sekund
+ * - "processing" : tolkning pågår → oppdaterer siden med jevne mellomrom.
+ *                  Gir opp etter ~5 min og viser "Prøv igjen" i stedet for
+ *                  en evig spinner.
+ * - "stuck"      : kontrakten har hengt i 'processing' for lenge (server
+ *                  bestemte det) → "Prøv igjen" med en gang.
  */
+const POLL_MS = 4000;
+const MAX_POLLS = 75; // ~5 minutter
+
 export function ExtractControls({
   contractId,
   mode,
 }: {
   contractId: string;
-  mode: "run" | "retry" | "processing";
+  mode: "run" | "retry" | "processing" | "stuck";
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [gaveUp, setGaveUp] = useState(false);
 
   useEffect(() => {
-    if (mode !== "processing") return;
-    const timer = setInterval(() => router.refresh(), 4000);
+    if (mode !== "processing" || gaveUp) return;
+    let polls = 0;
+    const timer = setInterval(() => {
+      polls += 1;
+      if (polls >= MAX_POLLS) {
+        setGaveUp(true);
+        clearInterval(timer);
+        return;
+      }
+      router.refresh();
+    }, POLL_MS);
     return () => clearInterval(timer);
-  }, [mode, router]);
+  }, [mode, gaveUp, router]);
 
-  if (mode === "processing") {
+  const showStuck = mode === "stuck" || gaveUp;
+
+  // Fersk tolkning pågår – bare vis at siden oppdaterer seg selv.
+  if (mode === "processing" && !showStuck) {
     return (
       <p className="mt-4 text-sm opacity-70">
         Leser kontrakten … siden oppdaterer seg selv.
@@ -35,14 +55,16 @@ export function ExtractControls({
     );
   }
 
+  // "retry" og "stuck"/ga-opp starter et nytt forsøk med force=1.
+  const forceRetry = mode === "retry" || showStuck;
+
   async function run() {
     setError(null);
     setBusy(true);
     try {
-      const url =
-        mode === "retry"
-          ? `/api/contracts/${contractId}/extract?force=1`
-          : `/api/contracts/${contractId}/extract`;
+      const url = forceRetry
+        ? `/api/contracts/${contractId}/extract?force=1`
+        : `/api/contracts/${contractId}/extract`;
       const res = await fetch(url, { method: "POST" });
       const json = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
@@ -50,6 +72,7 @@ export function ExtractControls({
         setBusy(false);
         return;
       }
+      setGaveUp(false);
       router.refresh();
     } catch {
       setError("Nettverksfeil. Prøv igjen.");
@@ -59,6 +82,12 @@ export function ExtractControls({
 
   return (
     <div className="mt-4 space-y-2">
+      {showStuck ? (
+        <p className="rounded-lg border border-black/15 bg-black/5 p-3 text-sm dark:border-white/20 dark:bg-white/10">
+          Dette tar lengre tid enn normalt. Tolkningen kan ha stoppet – prøv å
+          kjøre den på nytt.
+        </p>
+      ) : null}
       {error ? (
         <p className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
           {error}
@@ -70,11 +99,7 @@ export function ExtractControls({
         disabled={busy}
         className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
       >
-        {busy
-          ? "Starter …"
-          : mode === "retry"
-            ? "Prøv igjen"
-            : "Kjør uttrekk"}
+        {busy ? "Starter …" : forceRetry ? "Prøv igjen" : "Kjør uttrekk"}
       </button>
     </div>
   );

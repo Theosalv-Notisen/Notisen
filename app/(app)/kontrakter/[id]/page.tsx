@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import {
   formatDeadline,
+  isStuckProcessing,
   STATUS_LABEL,
   type ContractStatus,
 } from "@/lib/contract-status";
@@ -15,6 +16,7 @@ export const dynamic = "force-dynamic";
 type ContractDetail = {
   id: string;
   status: ContractStatus;
+  updated_at: string | null;
   original_filename: string | null;
   contract_start: string | null;
   term_months: number | null;
@@ -67,17 +69,17 @@ export default async function KontraktDetaljPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ bekreftet?: string }>;
+  searchParams: Promise<{ bekreftet?: string; justert?: string }>;
 }) {
   const { id } = await params;
-  const { bekreftet } = await searchParams;
+  const { bekreftet, justert } = await searchParams;
   await requireUser(`/kontrakter/${id}`);
 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("contract")
     .select(
-      "id, status, original_filename, contract_start, term_months, binding_until, auto_renews, renewal_date, notice_period_days, extraction_confidence, extraction_notes, extraction_error, needs_review, next_deadline, llm_model, llm_raw, supplier:supplier_id (name, organization_number)",
+      "id, status, updated_at, original_filename, contract_start, term_months, binding_until, auto_renews, renewal_date, notice_period_days, extraction_confidence, extraction_notes, extraction_error, needs_review, next_deadline, llm_model, llm_raw, supplier:supplier_id (name, organization_number)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -129,6 +131,13 @@ export default async function KontraktDetaljPage({
         </p>
       ) : null}
 
+      {justert ? (
+        <p className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+          Noen felt ble justert ved lagring: {justert}. Sjekk verdiene og lagre
+          på nytt om noe ble feil.
+        </p>
+      ) : null}
+
       {c.needs_review && c.status !== "confirmed" ? (
         <p className="mt-4 rounded-lg border border-black/15 bg-black/5 p-3 text-sm dark:border-white/20 dark:bg-white/10">
           Denne trenger en gjennomgang. Sjekk feltene mot PDF-en og bekreft.
@@ -147,7 +156,10 @@ export default async function KontraktDetaljPage({
       ) : null}
 
       {c.status === "processing" ? (
-        <ExtractControls contractId={c.id} mode="processing" />
+        <ExtractControls
+          contractId={c.id}
+          mode={isStuckProcessing(c.updated_at) ? "stuck" : "processing"}
+        />
       ) : null}
 
       {c.status === "failed" ? (

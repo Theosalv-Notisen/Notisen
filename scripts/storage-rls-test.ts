@@ -21,6 +21,7 @@
  * bytene er BYTE-FOR-BYTE uendret.
  */
 
+import { createHash } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { env } from "../lib/env.ts";
 
@@ -83,6 +84,23 @@ async function downloadBytes(
   const { data, error } = await client.storage.from(BUCKET).download(path);
   if (error || !data) return { bytes: null, error: error?.message ?? "ingen data" };
   return { bytes: Buffer.from(await data.arrayBuffer()), error: null };
+}
+
+function md5Hex(b: Buffer): string {
+  return createHash("md5").update(b).digest("hex");
+}
+
+/**
+ * Storage-metadata (eTag/size) for ett objekt, lest via `list` (DB-spørring,
+ * ikke CDN – så den viser alltid siste versjon rett etter en opplasting).
+ */
+async function objectMeta(
+  folder: string,
+  name: string,
+): Promise<{ eTag?: string; size?: number } | undefined> {
+  const { data } = await admin.storage.from(BUCKET).list(folder);
+  const row = data?.find((f) => f.name === name);
+  return row?.metadata as { eTag?: string; size?: number } | undefined;
 }
 
 async function main() {
@@ -210,10 +228,15 @@ async function main() {
       ["B", userIdB],
     ] as const) {
       const anonList = await anon.storage.from(BUCKET).list(folder);
+      const emptyList =
+        anonList.error == null && (anonList.data?.length ?? -1) === 0;
+      const deniedList = anonList.error != null;
       check(
-        `Uinnlogget klient ser 0 filer i ${label} sin mappe`,
-        !anonList.error ? (anonList.data?.length ?? -1) === 0 : true,
-        `fikk ${anonList.data?.length} treff`,
+        `Uinnlogget klient får ingen filer i ${label} sin mappe (tom liste eller avvist)`,
+        emptyList || deniedList,
+        anonList.error
+          ? `uventet feil: ${anonList.error.message}`
+          : `fikk ${anonList.data?.length ?? "?"} treff`,
       );
     }
     const anonDownload = await downloadBytes(anon, pathA);
@@ -274,13 +297,45 @@ async function main() {
       );
     }
 
-    // ── 9. Service role ser begge filene ──────────────────────────────
+    // ── 9. A KAN re-laste opp sin EGEN fil (upsert) ───────────────────
+    //  Hele grunnen til at UPDATE-policyen på storage.objects finnes.
+    //  Droppes den policyen skal denne bli rød. Kjøres sist så den ikke
+    //  forstyrrer fasiten i signert-URL-testene over.
+    //
+    //  Vi sammenligner storage-metadata (size + eTag/md5) via `list`, ikke
+    //  nedlastede bytes: download-endepunktet er CDN-cachet (max-age=3600) og
+    //  serverer gammelt innhold en god stund etter en oppdatering.
+    const bytesA2 = pdfBytes(`A-reupload-lengre-markor-${nonce}`);
+    const nameA = `${nonce}.pdf`;
+    const metaBefore = await objectMeta(userIdA, nameA);
+
+    const aReupload = await a.storage
+      .from(BUCKET)
+      .upload(pathA, bytesA2, { contentType: "application/pdf", upsert: true });
+    check(
+      "A kan re-laste opp sin egen fil med upsert",
+      !aReupload.error,
+      aReupload.error?.message,
+    );
+
+    const metaAfter = await objectMeta(userIdA, nameA);
+    const newHash = md5Hex(bytesA2);
+    check(
+      "A sin fil er faktisk oppdatert etter re-opplasting (size + eTag)",
+      bytesA2.length !== bytesA.length &&
+        metaAfter?.size === bytesA2.length &&
+        metaAfter?.eTag?.replace(/"/g, "") === newHash &&
+        metaAfter?.eTag !== metaBefore?.eTag,
+      `size=${metaAfter?.size} (ny ${bytesA2.length}, gammel ${bytesA.length}), eTag=${metaAfter?.eTag} vs md5 "${newHash}", før=${metaBefore?.eTag}`,
+    );
+
+    // ── 10. Service role ser begge filene ─────────────────────────────
     const adminA = await downloadBytes(admin, pathA);
     const adminB = await downloadBytes(admin, pathB);
     check("Service role ser A sin fil", adminA.bytes != null, adminA.error ?? "");
     check("Service role ser B sin fil", adminB.bytes != null, adminB.error ?? "");
 
-    // ── 10. Opprydding + verifiser at ingen nonce-filer ligger igjen ──
+    // ── 11. Opprydding + verifiser at ingen nonce-filer ligger igjen ──
     await admin.storage.from(BUCKET).remove([pathA, pathB, forgePathA]);
     const leftA = await admin.storage.from(BUCKET).list(userIdA);
     const leftB = await admin.storage.from(BUCKET).list(userIdB);

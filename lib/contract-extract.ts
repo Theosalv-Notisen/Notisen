@@ -5,14 +5,25 @@
  * Vi bruker IKKE et eget PDF-tekstuttrekk: Claude gjør vision/OCR selv, så
  * samme kodesti dekker både born-digital og skannede kontrakter.
  *
+ * Robusthet: kun hvis SELVE verktøykallet mangler / ikke er et objekt kaster vi
+ * (→ status 'failed'). Ett rart enkeltfelt (f.eks. `90.5`, `"1. mars 2025"`)
+ * blir `null` + degradert konfidens + en merknad – det velter ikke uttrekket.
+ *
  * Kun server-side.
  */
 
 import "server-only";
 
 import Anthropic from "@anthropic-ai/sdk";
-import { z } from "zod";
 import { env } from "./env.ts";
+import {
+  normalizeBoolean,
+  normalizeDate,
+  normalizeInteger,
+  NOTICE_PERIOD_DAYS_RANGE,
+  TERM_MONTHS_RANGE,
+  type FieldNorm,
+} from "./contract-fields.ts";
 
 /**
  * Modell-ID. `claude-sonnet-5` er en gyldig alias i `@anthropic-ai/sdk`
@@ -21,10 +32,6 @@ import { env } from "./env.ts";
 export const CONTRACT_MODEL = "claude-sonnet-5";
 
 const MAX_TOKENS = 1500;
-
-/** Antall år bakover/forover en dato får ligge før vi forkaster den. */
-const DATE_MIN_YEARS = 10;
-const DATE_MAX_YEARS = 15;
 
 export type Confidence = "high" | "medium" | "low";
 
@@ -52,6 +59,7 @@ Regler:
 - Bruk kun informasjon som står i dokumentet. Ikke gjett, ikke fyll inn "vanlige" bransjeverdier.
 - Er et felt uklart, fraværende eller tvetydig: sett det til null og forklar kort i "notes".
 - Alle datoer på formen ÅÅÅÅ-MM-DD.
+- term_months og notice_period_days skal være hele tall.
 - For hvert felt du gir en verdi: legg et ordrett sitat fra dokumentet i "source_quotes" som belegg (feltnavn + sitat).
 - Sett "confidence" etter hvor sikker og lesbar kilden er: dårlig skann, håndskrift eller tvetydig ordlyd => "low".`;
 
@@ -116,71 +124,28 @@ const TOOL: Anthropic.Tool = {
   },
 };
 
-const isoDate = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/)
-  .nullable()
-  .optional();
-
-const toolInputSchema = z.object({
-  contract_start: isoDate,
-  term_months: z.number().int().nullable().optional(),
-  binding_until: isoDate,
-  auto_renews: z.boolean().nullable().optional(),
-  renewal_date: isoDate,
-  notice_period_days: z.number().int().nullable().optional(),
-  confidence: z.enum(["high", "medium", "low"]).catch("low"),
-  notes: z.string().nullable().optional(),
-  source_quotes: z
-    .array(z.object({ field: z.string(), quote: z.string() }))
-    .nullable()
-    .optional(),
-});
-
-function addYears(iso: string, years: number): Date {
-  const d = new Date(iso + "T00:00:00Z");
-  d.setUTCFullYear(d.getUTCFullYear() + years);
-  return d;
-}
-
 /** Én hakk ned: high -> medium -> low. */
-function degrade(c: Confidence): Confidence {
-  if (c === "high") return "medium";
-  if (c === "medium") return "low";
-  return "low";
+function degradeConfidence(c: Confidence): Confidence {
+  return c === "high" ? "medium" : "low";
 }
 
-type Clamper = {
-  confidence: Confidence;
-  date(value: string | null | undefined): string | null;
-  intInRange(value: number | null | undefined, min: number, max: number): number | null;
-};
+function parseConfidence(input: unknown): Confidence {
+  return input === "high" || input === "medium" ? input : "low";
+}
 
-function makeClamper(today: string, initial: Confidence): Clamper {
-  const min = addYears(today, -DATE_MIN_YEARS).getTime();
-  const max = addYears(today, DATE_MAX_YEARS).getTime();
-  const state = { confidence: initial };
-
-  return {
-    get confidence() {
-      return state.confidence;
-    },
-    date(value) {
-      if (!value) return null;
-      const t = new Date(value + "T00:00:00Z").getTime();
-      if (Number.isNaN(t) || t < min || t > max) {
-        // Urimelig dato => forkast og degrader konfidens.
-        state.confidence = degrade(state.confidence);
-        return null;
+function parseSourceQuotes(input: unknown): SourceQuote[] {
+  if (!Array.isArray(input)) return [];
+  const out: SourceQuote[] = [];
+  for (const item of input) {
+    if (item && typeof item === "object") {
+      const field = (item as Record<string, unknown>).field;
+      const quote = (item as Record<string, unknown>).quote;
+      if (typeof field === "string" && typeof quote === "string") {
+        out.push({ field, quote });
       }
-      return value;
-    },
-    intInRange(value, lo, hi) {
-      if (value == null || !Number.isFinite(value)) return null;
-      if (value < lo || value > hi) return null;
-      return Math.round(value);
-    },
-  };
+    }
+  }
+  return out;
 }
 
 export type ExtractResult = {
@@ -232,30 +197,61 @@ export async function extractContractTerms(
       `Claude kalte ikke verktøyet (stop_reason: ${response.stop_reason}).`,
     );
   }
-
-  const parsed = toolInputSchema.safeParse(toolCall.input);
-  if (!parsed.success) {
-    throw new Error(
-      `Ugyldig verktøy-input fra Claude: ${parsed.error.issues
-        .map((i) => `${i.path.join(".")}: ${i.message}`)
-        .join("; ")}`,
-    );
+  if (
+    !toolCall.input ||
+    typeof toolCall.input !== "object" ||
+    Array.isArray(toolCall.input)
+  ) {
+    throw new Error("Claude returnerte et verktøykall uten gyldig input-objekt.");
   }
 
-  const raw = parsed.data;
-  const clamp = makeClamper(today, raw.confidence);
+  const input = toolCall.input as Record<string, unknown>;
+
+  // Per-felt-normalisering: samle merknader og degrader konfidens per forkastet felt.
+  const notes: string[] = [];
+  let confidence = parseConfidence(input.confidence);
+
+  function take<T>(result: FieldNorm<T>): T | null {
+    if (result.note) notes.push(result.note);
+    if (result.dropped) confidence = degradeConfidence(confidence);
+    return result.value;
+  }
 
   const fields: ExtractedFields = {
-    contract_start: clamp.date(raw.contract_start),
-    term_months: clamp.intInRange(raw.term_months, 0, 600),
-    binding_until: clamp.date(raw.binding_until),
-    auto_renews: raw.auto_renews ?? null,
-    renewal_date: clamp.date(raw.renewal_date),
-    notice_period_days: clamp.intInRange(raw.notice_period_days, 0, 1095),
-    extraction_confidence: clamp.confidence,
-    extraction_notes: raw.notes ?? null,
-    source_quotes: raw.source_quotes ?? [],
+    contract_start: take(
+      normalizeDate(input.contract_start, today, "Startdato"),
+    ),
+    term_months: take(
+      normalizeInteger(input.term_months, TERM_MONTHS_RANGE, "Avtaleperiode (måneder)"),
+    ),
+    binding_until: take(
+      normalizeDate(input.binding_until, today, "Bindingstid utløper"),
+    ),
+    auto_renews: normalizeBoolean(input.auto_renews),
+    renewal_date: take(
+      normalizeDate(input.renewal_date, today, "Fornyelsesdato"),
+    ),
+    notice_period_days: take(
+      normalizeInteger(
+        input.notice_period_days,
+        NOTICE_PERIOD_DAYS_RANGE,
+        "Oppsigelsesfrist (dager)",
+      ),
+    ),
+    extraction_confidence: confidence,
+    extraction_notes: buildNotes(input.notes, notes),
+    source_quotes: parseSourceQuotes(input.source_quotes),
   };
 
   return { fields, model: response.model, rawResponse: response };
+}
+
+/** Modellens egen `notes` + våre normaliseringsmerknader, slått sammen. */
+function buildNotes(modelNotes: unknown, normalizationNotes: string[]): string | null {
+  const parts: string[] = [];
+  if (typeof modelNotes === "string" && modelNotes.trim() !== "") {
+    parts.push(modelNotes.trim());
+  }
+  parts.push(...normalizationNotes);
+  return parts.length > 0 ? parts.join(" ") : null;
 }

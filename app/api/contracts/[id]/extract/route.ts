@@ -5,13 +5,21 @@ import { errorResponse } from "@/lib/api-errors";
 import { NotAuthenticatedError } from "@/lib/fiken-connection";
 import { extractContractTerms } from "@/lib/contract-extract";
 import { computeNextDeadline } from "@/lib/contract-deadline";
+import { isStuckProcessing } from "@/lib/contract-status";
 
 /**
  * POST /api/contracts/[id]/extract
  *
  * Laster ned kontrakt-PDF-en, sender den til Claude, lagrer uttrekket og
- * regner ut next_deadline. Idempotent: hopper over hvis kontrakten allerede
- * er (eller holder på å bli) tolket – med mindre ?force=1.
+ * regner ut next_deadline.
+ *
+ * Idempotent + kappløps-sikker: overgangen til 'processing' er én betinget
+ * update (optimistisk lås på `status` + `updated_at`). Bare requesten som
+ * "vinner" overgangen kaller Claude – samtidige poll-requests får bare
+ * tilbake nåværende tilstand.
+ *
+ * En kontrakt som har hengt i 'processing' i mer enn ~5 min (krasj/timeout/
+ * deploy midt i tolkningen) regnes som fastlåst og kan kjøres på nytt.
  *
  * Feil under selve tolkningen gir status 'failed' + `extraction_error` og
  * svarer 200 med tilstanden (ikke 500) – klienten kan da vise "Prøv igjen".
@@ -19,7 +27,10 @@ import { computeNextDeadline } from "@/lib/contract-deadline";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-const SKIP_STATUSES = ["processing", "extracted", "confirmed"];
+/** Utfall når en request ikke skal kjøre tolkningen selv. */
+function currentState(id: string, status: unknown) {
+  return NextResponse.json({ status, contractId: id });
+}
 
 export async function POST(
   request: Request,
@@ -42,7 +53,7 @@ export async function POST(
 
     const { data: contract, error } = await supabase
       .from("contract")
-      .select("id, status, storage_path")
+      .select("id, status, storage_path, updated_at")
       .eq("id", id)
       .maybeSingle();
     if (error) throw error;
@@ -53,14 +64,50 @@ export async function POST(
       );
     }
 
-    if (!force && SKIP_STATUSES.includes(contract.status as string)) {
-      return NextResponse.json({ status: contract.status, contractId: id });
+    const status = contract.status as string;
+    const stuck = isStuckProcessing(contract.updated_at as string | null);
+
+    // Kan denne requesten kjøre tolkningen?
+    const runnable =
+      force ||
+      status === "uploaded" ||
+      status === "failed" ||
+      (status === "processing" && stuck);
+
+    if (!runnable) {
+      // 'extracted', 'confirmed', 'draft' eller en fersk 'processing' → la den være.
+      return currentState(id, status);
+    }
+    if (force && status === "processing" && !stuck) {
+      // En tolkning kjører nettopp nå – ikke start en parallell.
+      return currentState(id, status);
     }
 
-    await supabase
+    // Betinget overgang: bare hvis raden ikke er rørt siden vi leste den.
+    // Da er det garantert denne requesten som skal kalle Claude.
+    const nowIso = new Date().toISOString();
+    let claim = supabase
       .from("contract")
-      .update({ status: "processing", updated_at: new Date().toISOString() })
-      .eq("id", id);
+      .update({ status: "processing", updated_at: nowIso })
+      .eq("id", id)
+      .eq("status", status);
+    if (contract.updated_at != null) {
+      claim = claim.eq("updated_at", contract.updated_at as string);
+    }
+    const { data: claimed, error: claimErr } = await claim
+      .select("id")
+      .maybeSingle();
+    if (claimErr) throw claimErr;
+    if (!claimed) {
+      // En annen request vant overgangen (eller status endret seg). Returner
+      // det som nå står i basen.
+      const { data: fresh } = await supabase
+        .from("contract")
+        .select("status")
+        .eq("id", id)
+        .maybeSingle();
+      return currentState(id, fresh?.status ?? status);
+    }
 
     try {
       const download = await supabase.storage
