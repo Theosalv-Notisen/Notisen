@@ -16,6 +16,13 @@
  * `runExtraction` er stubbet som no-op – vi tester bare roll-forward-delen.
  * For eksakt-dato-assertions regner vi forventet frist in-test med
  * `computeNextDeadline` + `deadlineFieldsFromRow` (samme som produksjonskoden).
+ *
+ * MERK: scriptet kjører ekte `runMaintenance` (og ekte `runReminders`) mot
+ * databasen – ikke isolert fra prod-data. Samme avveining som reminders-test.ts.
+ * Testradene er vernet med en unik `nonce` i storage_path/slug, og `finally`
+ * sletter alltid testbrukeren (cascade rydder supplier/contract/reminder_log).
+ * Assertions mot summary-tellere bruker derfor `>=` (seedet minimum), aldri
+ * eksakt likhet – prod kan ha egne rullbare kontrakter / gamle reminder_log-rader.
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -120,11 +127,17 @@ async function main() {
       throw new Error(`Klarte ikke lage supplier: ${supplierErr?.message}`);
     }
 
-    // Felt-oppsett som gir en framtidig frist ved re-beregning.
+    // Felt-oppsett som ruller fram til en trygg framtidig frist.
+    //
+    // `binding_until` er et RELATIVT offset (i dag + 150 dager), ikke en fast
+    // kalenderdato. Da er den rullede fristen alltid nøyaktig 150 dager unna
+    // uansett når testen kjøres – godt utenfor `runReminders` sitt 90-dagers-
+    // vindu. En fast `renewal_date`/anniversary ville rullet til en dato som
+    // ~2,5 måneder i året faller innenfor 90-dagersvinduet, og da ville
+    // Case 8s «ingen e-post for c1» feilet på en frisk build.
     const rollsForward = dl({
-      auto_renews: true,
-      renewal_date: "2020-03-15",
-      notice_period_days: 60,
+      binding_until: plusDays(150),
+      notice_period_days: 0,
     });
 
     const seeds: Seed[] = [
@@ -190,6 +203,38 @@ async function main() {
           binding_until: plusDays(45),
           notice_period_days: 0,
         }),
+      },
+      // 10: auto_renews=null (ukjent) er den eneste blokkeren – start + periode
+      //     ellers komplett → computeNextDeadline gir null → til gjennomgang.
+      {
+        key: "c10",
+        status: "confirmed",
+        needs_review: false,
+        next_deadline: plusDays(-40),
+        fields: dl({
+          auto_renews: null,
+          contract_start: "2020-01-01",
+          term_months: 12,
+          notice_period_days: 30,
+        }),
+      },
+      // 11: frist nøyaktig på grace-grensen (i dag − 14). `.lt` er streng `<`,
+      //     så cutoff-dagen selv skal IKKE rulles.
+      {
+        key: "c11",
+        status: "confirmed",
+        needs_review: false,
+        next_deadline: plusDays(-14),
+        fields: rollsForward,
+      },
+      // 12: allerede til gjennomgang (needs_review=true) + passert frist →
+      //     `.eq("needs_review", false)` ekskluderer den → urørt.
+      {
+        key: "c12",
+        status: "confirmed",
+        needs_review: true,
+        next_deadline: plusDays(-40),
+        fields: rollsForward,
       },
     ];
 
@@ -300,8 +345,8 @@ async function main() {
     check("Case 2 – c2.needs_review == true", c2.needs_review === true);
     check("Case 2 – c2.deadline_rolled_at satt", c2.deadline_rolled_at !== null);
     check(
-      "Case 2 – summary.deadlinesClearedForReview inkluderer c2 (+ c3)",
-      summary1.deadlinesClearedForReview >= 2,
+      "Case 2 – summary.deadlinesClearedForReview inkluderer c2, c3, c10",
+      summary1.deadlinesClearedForReview >= 3,
       `deadlinesClearedForReview=${summary1.deadlinesClearedForReview}`,
     );
 
@@ -348,6 +393,34 @@ async function main() {
     );
     check("Case 8 – c8.needs_review forblir false", c8.needs_review === false);
 
+    // Case 10 – auto_renews=null → re-beregning gir null → til gjennomgang
+    const c10 = await getContract("c10");
+    check(
+      "Case 10 – c10 (auto_renews=null): next_deadline=null, needs_review=true, rolled_at satt",
+      c10.next_deadline === null &&
+        c10.needs_review === true &&
+        c10.deadline_rolled_at !== null,
+      `next_deadline=${c10.next_deadline}, needs_review=${c10.needs_review}, rolled_at=${c10.deadline_rolled_at}`,
+    );
+
+    // Case 11 – frist nøyaktig i dag − 14 (grace-grensen) → urørt
+    const c11 = await getContract("c11");
+    check(
+      "Case 11 – c11 (frist == i dag − 14) urørt: next_deadline uendret, rolled_at null",
+      c11.next_deadline === plusDays(-14) && c11.deadline_rolled_at === null,
+      `next_deadline=${c11.next_deadline}, rolled_at=${c11.deadline_rolled_at}`,
+    );
+
+    // Case 12 – allerede needs_review=true → ekskludert → urørt
+    const c12 = await getContract("c12");
+    check(
+      "Case 12 – c12 (needs_review=true) urørt: next_deadline uendret, rolled_at null",
+      c12.next_deadline === plusDays(-40) &&
+        c12.deadline_rolled_at === null &&
+        c12.needs_review === true,
+      `next_deadline=${c12.next_deadline}, rolled_at=${c12.deadline_rolled_at}, needs_review=${c12.needs_review}`,
+    );
+
     // Case 9 – reminder_log-opprydding
     const { data: staleLogAfter } = await admin
       .from("reminder_log")
@@ -370,8 +443,8 @@ async function main() {
       "raden ble slettet",
     );
     check(
-      "Case 9 – summary.reminderLogsPruned == 1",
-      summary1.reminderLogsPruned === 1,
+      "Case 9 – summary.reminderLogsPruned >= 1 (kan også rydde ekte prod-rader)",
+      summary1.reminderLogsPruned >= 1,
       `reminderLogsPruned=${summary1.reminderLogsPruned}`,
     );
 
@@ -393,7 +466,7 @@ async function main() {
     );
     const c1Mails = sentReminders.filter((e) => e.contractId === id("c1"));
     check(
-      "Case 8 – ingen e-post for c1 (frist > 90 dager unna)",
+      "Case 8 – ingen e-post for c1 (rullet frist er 150 dager unna, utenfor vinduet)",
       c1Mails.length === 0,
       `antall=${c1Mails.length}`,
     );

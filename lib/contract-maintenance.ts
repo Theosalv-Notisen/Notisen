@@ -249,11 +249,22 @@ async function rollForwardDeadlines(
               updated_at: nowIso,
             };
 
-      const { error: updErr } = await supabase
+      // TOCTOU-vern: re-assert status/needs_review i UPDATE-en. Rekker en
+      // bruker å bekrefte kontrakten (eller sette den til gjennomgang) mellom
+      // SELECT og UPDATE, matcher raden ikke lenger og brukerens ferske
+      // next_deadline blir stående. `.eq("needs_review", false)` matcher fortsatt
+      // raden slik den var ved SELECT også i null-grenen (som setter true).
+      const { data: updated, error: updErr } = await supabase
         .from("contract")
         .update(patch)
-        .eq("id", row.id);
+        .eq("id", row.id)
+        .eq("status", "confirmed")
+        .eq("needs_review", false)
+        .select("id");
       if (updErr) throw new Error(updErr.message);
+
+      // 0 rader → raden endret seg under oss. Hopp over, ikke tell.
+      if (!updated || updated.length === 0) continue;
 
       if (result.date !== null) {
         summary.deadlinesRolled++;
