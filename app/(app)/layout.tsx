@@ -23,6 +23,9 @@ export default function AppLayout({
             <Link href="/dashboard" className="opacity-80 hover:opacity-100">
               Oversikt
             </Link>
+            <Link href="/kontrakter" className="opacity-80 hover:opacity-100">
+              Kontrakter
+            </Link>
             <Link href="/settings" className="opacity-80 hover:opacity-100">
               Innstillinger
             </Link>

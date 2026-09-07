@@ -62,7 +62,13 @@ function formatNok(amount: number | null): string {
   return `${amount.toLocaleString("nb-NO")} kr`;
 }
 
-function SupplierCard({ row }: { row: SupplierRecurrence }) {
+function SupplierCard({
+  row,
+  companySlug,
+}: {
+  row: SupplierRecurrence;
+  companySlug: string;
+}) {
   const highlight = row.isLikelyRecurring;
 
   return (
@@ -107,6 +113,15 @@ function SupplierCard({ row }: { row: SupplierRecurrence }) {
           <dd>{formatNok(row.medianAmountNok)}</dd>
         </div>
       </dl>
+
+      <Link
+        href={`/kontrakter/ny?company=${encodeURIComponent(
+          companySlug,
+        )}&contact=${row.supplierId}`}
+        className="mt-3 inline-block rounded-lg border border-black/15 px-3 py-1.5 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
+      >
+        Last opp kontrakt
+      </Link>
     </li>
   );
 }
@@ -202,7 +217,11 @@ export default async function DashboardPage() {
           ) : (
             <ul className="mt-3 space-y-3">
               {company.rows.map((row) => (
-                <SupplierCard key={row.supplierId} row={row} />
+                <SupplierCard
+                  key={row.supplierId}
+                  row={row}
+                  companySlug={company.slug}
+                />
               ))}
             </ul>
           )}

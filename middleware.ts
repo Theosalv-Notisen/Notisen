@@ -3,7 +3,7 @@ import { updateSession } from "@/lib/supabase/middleware";
 
 /**
  * Tynn wrapper – all logikk ligger i lib/supabase/middleware.ts.
- * Fornyer sesjonen og beskytter /dashboard + /settings.
+ * Fornyer sesjonen og beskytter /dashboard + /settings + /kontrakter.
  */
 export async function middleware(request: NextRequest) {
   return await updateSession(request);

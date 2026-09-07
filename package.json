@@ -9,10 +9,12 @@
     "start": "next start",
     "lint": "next lint",
     "fiken:test": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/fiken-test.ts",
-    "rls:test": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/rls-test.ts"
+    "rls:test": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/rls-test.ts",
+    "storage-rls:test": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/storage-rls-test.ts",
+    "deadline:test": "node scripts/deadline-test.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0",
+    "@anthropic-ai/sdk": "^0.124.0",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.48.1",
     "next": "^15.5.0",

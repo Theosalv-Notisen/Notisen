@@ -119,6 +119,36 @@ create policy "egne reminder_log" on public.reminder_log
     )
   );
 
--- Storage-bucket for kontrakter (privat). Kjør én gang:
--- insert into storage.buckets (id, name, public) values ('contracts', 'contracts', false)
---   on conflict do nothing;
+-- Storage-bucket for kontrakter (privat): se supabase/storage.sql.
+-- Kjør den fila ETTER denne.
+
+-- ─────────────────────────────────────────────────────────────
+-- Migrasjoner (idempotente – trygge å re-kjøre)
+--
+-- Kjøres på toppen av et eksisterende skjema. Nye installasjoner får
+-- alt over PLUSS dette, så det er greit at det overlapper litt.
+-- ─────────────────────────────────────────────────────────────
+
+-- Kontrakt: felt for LLM-uttrekk + gjennomgangsflyt.
+alter table public.contract
+  add column if not exists renewal_date          date,
+  add column if not exists term_months           integer,
+  add column if not exists extraction_confidence  text
+    check (extraction_confidence in ('high','medium','low')),
+  add column if not exists extraction_notes       text,
+  add column if not exists extraction_error       text,
+  add column if not exists needs_review           boolean not null default false;
+
+-- Ny status 'draft': raden finnes før PDF-en er lastet opp til Storage.
+alter table public.contract drop constraint if exists contract_status_check;
+alter table public.contract add constraint contract_status_check
+  check (status in ('draft','uploaded','processing','extracted','failed','confirmed'));
+
+-- Leverandør: knytt raden til ett Fiken-selskap, så samme kontakt-id i to
+-- selskaper blir to rader.
+alter table public.supplier add column if not exists company_slug text;
+alter table public.supplier drop constraint if exists supplier_user_id_fiken_contact_id_key;
+alter table public.supplier drop constraint if exists supplier_user_company_contact_key;
+alter table public.supplier
+  add constraint supplier_user_company_contact_key
+  unique (user_id, company_slug, fiken_contact_id);
