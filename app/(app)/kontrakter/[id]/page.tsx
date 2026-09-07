@@ -72,12 +72,13 @@ export default async function KontraktDetaljPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{
     bekreftet?: string;
+    uten_frist?: string;
     justert?: string;
     feil?: "slett" | "bekreft" | string;
   }>;
 }) {
   const { id } = await params;
-  const { bekreftet, justert, feil } = await searchParams;
+  const { bekreftet, uten_frist, justert, feil } = await searchParams;
   await requireUser(`/kontrakter/${id}`);
 
   const supabase = await createClient();
@@ -130,7 +131,13 @@ export default async function KontraktDetaljPage({
         </a>
       </p>
 
-      {bekreftet ? (
+      {bekreftet && uten_frist ? (
+        <p className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+          Kontrakten er lagret, men vi fant ingen dato å telle ned til. Da får du
+          ikke påminnelser for denne før du legger inn en frist (startdato +
+          varighet, bindingstid eller fornyelsesdato) manuelt.
+        </p>
+      ) : bekreftet ? (
         <p className="mt-4 rounded-lg border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-700 dark:text-green-300">
           Kontrakten er bekreftet. Nå kan den utløse påminnelser.
         </p>

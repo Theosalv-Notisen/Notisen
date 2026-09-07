@@ -108,7 +108,10 @@ export async function confirmContract(formData: FormData) {
     .update({
       ...fields,
       next_deadline: deadline.date,
-      needs_review: false,
+      // Uten en beregnet frist er kontrakten reelt umonitorert – behold
+      // needs_review slik at varsel-cronen (som krever needs_review = false)
+      // ikke plukker den opp, og si det tydelig til brukeren under.
+      needs_review: deadline.date === null,
       status: "confirmed",
       updated_at: new Date().toISOString(),
     })
@@ -124,6 +127,7 @@ export async function confirmContract(formData: FormData) {
   revalidatePath("/kontrakter");
 
   const query = new URLSearchParams({ bekreftet: "1" });
+  if (deadline.date === null) query.set("uten_frist", "1");
   if (adjustments.length > 0) {
     query.set("justert", adjustments.join(" | "));
   }
