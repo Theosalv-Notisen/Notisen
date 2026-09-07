@@ -18,7 +18,12 @@ function optional(name: string): string | undefined {
 }
 
 export const env = {
-  fikenToken: () => required("FIKEN_API_TOKEN"),
+  // Fiken OAuth2-klient ("Notisen"-appen i Fiken)
+  fikenClientId: () => required("FIKEN_CLIENT_ID"),
+  fikenClientSecret: () => required("FIKEN_CLIENT_SECRET"),
+  fikenRedirectUri: () =>
+    optional("FIKEN_REDIRECT_URI") ??
+    "http://localhost:3000/api/fiken/oauth/callback",
 
   supabaseUrl: () => required("NEXT_PUBLIC_SUPABASE_URL"),
   supabaseAnonKey: () => required("NEXT_PUBLIC_SUPABASE_ANON_KEY"),

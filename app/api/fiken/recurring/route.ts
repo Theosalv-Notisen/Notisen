@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { getFikenClientForCurrentUser } from "@/lib/fiken-connection";
+import { analyzeRecurring } from "@/lib/recurring";
 import { errorResponse } from "@/lib/api-errors";
 
 /**
- * GET /api/fiken/suppliers
- * Leverandører for alle selskaper den innloggede brukerens Fiken-token ser.
+ * GET /api/fiken/recurring
+ * Kjører gjenkjenningslogikken: hvilke leverandører ser ut som løpende avtaler?
+ * Brukes av dashboardet til å foreslå kontraktopplasting.
  */
 export async function GET() {
   try {
@@ -15,12 +17,7 @@ export async function GET() {
       companies.map(async (company) => ({
         company: company.name,
         slug: company.slug,
-        suppliers: (await fiken.suppliers(company.slug)).map((s) => ({
-          contactId: s.contactId,
-          name: s.name,
-          email: s.email ?? null,
-          organizationNumber: s.organizationNumber ?? null,
-        })),
+        suppliers: analyzeRecurring(await fiken.purchases(company.slug)),
       })),
     );
 

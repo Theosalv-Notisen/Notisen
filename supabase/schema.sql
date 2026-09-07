@@ -8,16 +8,20 @@
 create extension if not exists "pgcrypto";
 
 -- ─────────────────────────────────────────────────────────────
--- fiken_connection: én Fiken-nøkkel per bruker
+-- fiken_connection: OAuth2-tokens per bruker (én Fiken-tilkobling)
 -- ─────────────────────────────────────────────────────────────
 create table if not exists public.fiken_connection (
-  id            uuid primary key default gen_random_uuid(),
-  user_id       uuid not null references auth.users (id) on delete cascade,
-  -- API-token bør krypteres/legges i en vault i produksjon. MVP: ren tekst.
-  api_token     text not null,
-  company_slug  text,
-  company_name  text,
-  created_at    timestamptz not null default now(),
+  id                       uuid primary key default gen_random_uuid(),
+  user_id                  uuid not null references auth.users (id) on delete cascade,
+  -- OAuth2-tokens. Bør krypteres / legges i Supabase Vault i produksjon.
+  access_token             text not null,
+  refresh_token            text not null,
+  access_token_expires_at  timestamptz not null,
+  -- Valgt selskap i Fiken (en token kan ha tilgang til flere).
+  company_slug             text,
+  company_name             text,
+  created_at               timestamptz not null default now(),
+  updated_at               timestamptz not null default now(),
   unique (user_id)
 );
 

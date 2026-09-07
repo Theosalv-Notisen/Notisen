@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { env } from "@/lib/env";
+import { env } from "../env.ts";
 
 /**
  * Admin-klient med service role-nøkkel. Går forbi RLS.

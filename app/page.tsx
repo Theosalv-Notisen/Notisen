@@ -7,20 +7,18 @@ export default function Home() {
       </p>
 
       <div className="mt-10 rounded-xl border border-black/10 p-6 dark:border-white/15">
-        <h2 className="font-medium">Kom i gang</h2>
-        <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm opacity-80">
-          <li>Legg inn Fiken-nøkkel i <code>.env.local</code></li>
+        <h2 className="font-medium">Status</h2>
+        <ul className="mt-3 list-disc space-y-1 pl-5 text-sm opacity-80">
+          <li>Fiken OAuth-flyt: /api/fiken/oauth/start → callback</li>
+          <li>Gjenkjenning av løpende avtaler: lib/recurring.ts</li>
           <li>
-            Kjør <code>npm run fiken:suppliers</code> for å teste tilkoblingen
+            Test mot ekte data uten resten av appen:{" "}
+            <code>npm run fiken:test</code>
           </li>
-          <li>
-            Åpne{" "}
-            <a className="underline" href="/api/fiken/suppliers">
-              /api/fiken/suppliers
-            </a>{" "}
-            for å se leverandørene som JSON
-          </li>
-        </ol>
+        </ul>
+        <p className="mt-4 text-sm opacity-60">
+          Innlogging (Supabase Auth), dashboard og PDF-opplasting kommer.
+        </p>
       </div>
     </main>
   );

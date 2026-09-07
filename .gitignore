@@ -15,3 +15,6 @@ next-env.d.ts
 *.pem
 npm-debug.log*
 .vercel
+
+# lokale tokens fra scripts/fiken-test.ts
+.fiken-tokens.json
