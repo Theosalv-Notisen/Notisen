@@ -24,6 +24,9 @@ import { runExtraction } from "@/lib/contract-extract-run";
  * svarer 200 med tilstanden (ikke 500) – klienten kan da vise "Prøv igjen".
  */
 export const runtime = "nodejs";
+// Ett enkelt, bruker-trigget uttrekk. På Vercel Hobby klampes dette til 60s
+// (300 krever Pro); det er akseptabelt her siden brukeren står og venter og
+// kan trykke "Prøv igjen" hvis det tar for lang tid.
 export const maxDuration = 300;
 
 export async function POST(

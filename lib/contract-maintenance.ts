@@ -57,7 +57,9 @@ export async function runMaintenance(
   deps: MaintenanceDeps,
 ): Promise<MaintenanceSummary> {
   const { supabase, now } = deps;
-  const maxExtractions = deps.maxExtractions ?? 3;
+  // Default 2: cron-ruta kjører på Vercel Hobby med maxDuration klampet til 60s.
+  // 2 Claude-uttrekk + draft-opprydding holder seg trygt under grensen.
+  const maxExtractions = deps.maxExtractions ?? 2;
 
   const summary: MaintenanceSummary = {
     staleReprocessed: 0,

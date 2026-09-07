@@ -15,6 +15,7 @@ import { sendReminderEmail } from "@/lib/email";
  * Kjører med service role (admin-klient) og går forbi RLS – all
  * status-/eierskaps-filtrering ligger eksplisitt i `runReminders`.
  */
+export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function GET(request: Request) {

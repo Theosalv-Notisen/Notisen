@@ -21,6 +21,7 @@ import { createClient } from "@supabase/supabase-js";
 import { env } from "../lib/env.ts";
 import {
   runReminders,
+  supplierName,
   type ReminderEmailInput,
 } from "../lib/reminders.ts";
 
@@ -125,9 +126,66 @@ async function main() {
       contractIds.set(seed.key, row.id);
     }
 
+    // ── Case 8: confirmed-kontrakt uten supplier-rad ─────────────────
+    // `contract.supplier_id` er NOT NULL med ON DELETE CASCADE i skjemaet, så
+    // vi kan verken sette den til null eller slette supplier-raden uten å
+    // miste kontrakten. Vi lager derfor en egen, slettbar supplier, peker c8
+    // på den og sletter den:
+    //   - Cascader den bort kontrakten → da kan tilstanden "confirmed uten
+    //     supplier" heller ikke oppstå i prod, og det dokumenterer testen.
+    //   - Overlever kontrakten → den skal fortsatt varsles, og supplierName
+    //     skal falle tilbake til "Ukjent leverandør" uten å krasje.
+    const { data: supplierB, error: supplierBErr } = await admin
+      .from("supplier")
+      .insert({
+        user_id: userId,
+        company_slug: `slug-b-${nonce}`,
+        fiken_contact_id: 990001,
+        name: `Slettbar leverandør ${nonce}`,
+      })
+      .select("id")
+      .single();
+    if (supplierBErr || !supplierB) {
+      throw new Error(`Klarte ikke lage supplier B: ${supplierBErr?.message}`);
+    }
+
+    const { data: c8row, error: c8Err } = await admin
+      .from("contract")
+      .insert({
+        user_id: userId,
+        supplier_id: supplierB.id,
+        storage_path: `test/${nonce}-c8.pdf`,
+        original_filename: "c8.pdf",
+        status: "confirmed",
+        needs_review: false,
+        next_deadline: plusDays(80),
+      })
+      .select("id")
+      .single();
+    if (c8Err || !c8row) {
+      throw new Error(`Klarte ikke lage contract c8: ${c8Err?.message}`);
+    }
+    contractIds.set("c8", c8row.id);
+
+    await admin.from("supplier").delete().eq("id", supplierB.id);
+
+    const { data: c8after } = await admin
+      .from("contract")
+      .select("id")
+      .eq("id", c8row.id)
+      .maybeSingle();
+    const c8Survived = Boolean(c8after);
+
     const id = (k: string) => contractIds.get(k)!;
 
-    const getUserEmail = async (uid: string) => (uid === userId ? email : null);
+    // Teller antall oppslag mot e-post-stubben. `runReminders` skal cache
+    // adressen pr. bruker i én kjøring – flere kontrakter for samme bruker
+    // skal gi nøyaktig ett oppslag.
+    let getUserEmailCalls = 0;
+    const getUserEmail = async (uid: string) => {
+      getUserEmailCalls++;
+      return uid === userId ? email : null;
+    };
 
     // ── Kjøring 1: stub-mailer som KASTER for c7 ────────────────────────
     const sent1: ReminderEmailInput[] = [];
@@ -223,6 +281,46 @@ async function main() {
       "Case 7 – reminder_log for c7 har backfill 60 og 90, men IKKE 30",
       JSON.stringify(await logRows(id("c7"))) === JSON.stringify([60, 90]),
       `logg = ${JSON.stringify(await logRows(id("c7")))}`,
+    );
+
+    // emailCache: flere kontrakter for SAMME bruker i kjøring 1 (c1, c5, c7 …)
+    // skal bare gi ett oppslag mot getUserEmail.
+    check(
+      "emailCache – getUserEmail kalt kun én gang i kjøring 1 (flere kontrakter, samme bruker)",
+      getUserEmailCalls === 1,
+      `kalt ${getUserEmailCalls} ganger`,
+    );
+    check(
+      "To confirmed-kontrakter for samme bruker (c1 + c5) fikk begge e-post i kjøring 1",
+      emailsFor(sent1, "c1").length === 1 && emailsFor(sent1, "c5").length === 1,
+      `c1=${emailsFor(sent1, "c1").length}, c5=${emailsFor(sent1, "c5").length}`,
+    );
+
+    // Case 8: confirmed-kontrakt uten supplier-rad
+    if (c8Survived) {
+      const c8Mails = emailsFor(sent1, "c8");
+      check(
+        "Case 8 – kontrakt uten supplier varsles fortsatt (1 e-post)",
+        c8Mails.length === 1,
+        `fikk ${c8Mails.length}`,
+      );
+      check(
+        'Case 8 – supplierName faller tilbake til "Ukjent leverandør"',
+        c8Mails[0]?.supplierName === "Ukjent leverandør",
+        `supplierName = ${c8Mails[0]?.supplierName}`,
+      );
+    } else {
+      check(
+        'Case 8 – sletting av supplier cascader bort kontrakten ("confirmed uten supplier" kan ikke oppstå via skjemaet)',
+        true,
+      );
+    }
+    // …og fallbacken i seg selv, uavhengig av FK-cascaden over:
+    check(
+      'Case 8 – supplierName(null / tomt array / manglende navn) → "Ukjent leverandør"',
+      supplierName({ supplier: null }) === "Ukjent leverandør" &&
+        supplierName({ supplier: [] }) === "Ukjent leverandør" &&
+        supplierName({ supplier: { name: null } }) === "Ukjent leverandør",
     );
 
     // ── Kjøring 2: idempotens + self-healing ───────────────────────────

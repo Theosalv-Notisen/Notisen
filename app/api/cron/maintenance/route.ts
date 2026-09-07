@@ -15,7 +15,11 @@ import { runExtraction } from "@/lib/contract-extract-run";
  * Kjører med service role (admin-klient) og går forbi RLS – all filtrering
  * ligger eksplisitt i `runMaintenance`.
  */
-export const maxDuration = 300;
+export const runtime = "nodejs";
+// Vercel Hobby kapper funksjonsvarighet til 60s uansett (300 krever Pro), så
+// vi setter 60 eksplisitt og lar `runMaintenance` gjøre lite nok pr. kjøring
+// (default 2 Claude-uttrekk + draft-opprydding) til å holde seg trygt under.
+export const maxDuration = 60;
 
 export async function GET(request: Request) {
   // Hent secret defensivt: mangler den, svarer vi 401 (ikke 500).

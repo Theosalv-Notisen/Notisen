@@ -99,7 +99,11 @@ export async function confirmContract(formData: FormData) {
     today,
   );
 
-  const { error } = await supabase
+  // `.select(...).maybeSingle()` gjør at vi ser om en rad faktisk ble oppdatert.
+  // Bekrefter man en id som ikke finnes / ikke er sin egen → 0 rader, og da skal
+  // brukeren IKKE få en falsk "bekreftet"-kvittering (samme mønster som
+  // deleteContractById). Da sender vi tilbake til detaljsiden med ?feil=bekreft.
+  const { data: updated, error } = await supabase
     .from("contract")
     .update({
       ...fields,
@@ -109,9 +113,12 @@ export async function confirmContract(formData: FormData) {
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
-    .eq("user_id", user.id);
+    .eq("user_id", user.id)
+    .select("id")
+    .maybeSingle();
 
   if (error) throw error;
+  if (!updated) redirect(`/kontrakter/${id}?feil=bekreft`);
 
   revalidatePath(`/kontrakter/${id}`);
   revalidatePath("/kontrakter");
@@ -130,7 +137,9 @@ export async function confirmContract(formData: FormData) {
  */
 export async function deleteContract(formData: FormData) {
   const id = emptyToNull(formData.get("id"));
-  if (!id) throw new Error("Mangler kontrakt-id.");
+  // Mangler id-en er det ingen meningsfull detaljside å gå tilbake til –
+  // send brukeren til oversikten i stedet for Next sin råe feilside.
+  if (!id) redirect("/kontrakter");
 
   const supabase = await createClient();
   const {

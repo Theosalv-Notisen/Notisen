@@ -79,7 +79,15 @@ function addDaysIso(iso: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function supplierName(row: ContractRow): string {
+/**
+ * Leverandørnavnet vi viser i varselet. PostgREST kan gi embeddede rader som
+ * objekt eller ett-elements array, og – om FK-en noen gang skulle mangle – som
+ * null. Alle tre tilfellene faller trygt tilbake til "Ukjent leverandør".
+ *
+ * Eksportert så testene kan sjekke fallbacken direkte (skjemaet gjør det
+ * umulig å seede en contract-rad uten supplier).
+ */
+export function supplierName(row: Pick<ContractRow, "supplier">): string {
   const s = Array.isArray(row.supplier) ? row.supplier[0] : row.supplier;
   return s?.name ?? "Ukjent leverandør";
 }

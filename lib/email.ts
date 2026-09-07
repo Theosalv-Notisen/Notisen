@@ -46,10 +46,14 @@ export async function sendReminderEmail(input: ReminderEmailInput): Promise<void
     `Se kontrakten i Notisen: ${link}`,
   ].join("\n");
 
+  // ALLE interpolerte verdier escapes – også de som i dag alltid er systemverdier
+  // (dato, tall, lenke). Lenken bygges ferdig først og escapes så i sin helhet
+  // før den går inn i både href="..." og lenketeksten.
+  const safeLink = escapeHtml(link);
   const html = [
     `<p>Avtalen med <strong>${escapeHtml(input.supplierName)}</strong> har en oppsigelsesfrist som nærmer seg.</p>`,
-    `<p>Si opp senest <strong>${input.deadline}</strong> for å unngå at avtalen binder eller fornyer seg videre. Det er ${input.daysLeft} dager igjen til fristen.</p>`,
-    `<p><a href="${link}">Se kontrakten i Notisen</a></p>`,
+    `<p>Si opp senest <strong>${escapeHtml(input.deadline)}</strong> for å unngå at avtalen binder eller fornyer seg videre. Det er ${escapeHtml(String(input.daysLeft))} dager igjen til fristen.</p>`,
+    `<p><a href="${safeLink}">Se kontrakten i Notisen</a></p>`,
   ].join("\n");
 
   const { error } = await resend.emails.send({

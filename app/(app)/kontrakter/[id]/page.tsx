@@ -70,7 +70,11 @@ export default async function KontraktDetaljPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ bekreftet?: string; justert?: string; feil?: string }>;
+  searchParams: Promise<{
+    bekreftet?: string;
+    justert?: string;
+    feil?: "slett" | "bekreft" | string;
+  }>;
 }) {
   const { id } = await params;
   const { bekreftet, justert, feil } = await searchParams;
@@ -143,6 +147,13 @@ export default async function KontraktDetaljPage({
         <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
           Klarte ikke slette kontrakten. Den finnes kanskje ikke lenger, eller du
           har ikke tilgang til den.
+        </p>
+      ) : null}
+
+      {feil === "bekreft" ? (
+        <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+          Klarte ikke bekrefte kontrakten. Den finnes kanskje ikke lenger, eller
+          du har ikke tilgang til den.
         </p>
       ) : null}
 
