@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "dev",
-      "runtimeExecutable": "/Users/theosalvesen/.local/node/bin/npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeExecutable": "/bin/sh",
+      "runtimeArgs": ["/Users/theosalvesen/code/notisen/.claude/dev.sh"],
       "port": 3000
     }
   ]
