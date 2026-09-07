@@ -122,7 +122,7 @@ export function analyzeRecurring(
     const supplier = p.supplier;
     if (!supplier?.contactId) continue;
     const g = groups.get(supplier.contactId) ?? {
-      name: supplier.name,
+      name: supplier.name ?? "Ukjent leverandør",
       points: [],
     };
     g.points.push({

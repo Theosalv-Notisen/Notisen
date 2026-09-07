@@ -21,6 +21,18 @@ export class NoFikenConnectionError extends Error {
 }
 
 /**
+ * Ingen innlogget bruker. Egen klasse så `lib/api-errors.ts` kan svare 401
+ * i stedet for en generisk 500. Bor her (ikke i `lib/auth.ts`) fordi
+ * `api-errors.ts` allerede importerer fra denne fila – ingen ny syklus.
+ */
+export class NotAuthenticatedError extends Error {
+  constructor() {
+    super("Ikke innlogget.");
+    this.name = "NotAuthenticatedError";
+  }
+}
+
+/**
  * Refresh-tokenet ble avvist av Fiken (typisk `invalid_grant` – tilbaketrukket
  * tilgang eller rotert bort). Brukeren må koble til på nytt. Vi sletter ikke
  * raden automatisk, så `/settings` kan vise en tydelig "koble til på nytt".
@@ -32,10 +44,17 @@ export class FikenReauthRequiredError extends Error {
   }
 }
 
-/** Ser feilen fra token-endepunktet ut som et avvist refresh-token? */
+/**
+ * Ser feilen fra token-endepunktet ut som et avvist refresh-token?
+ *
+ * Match kun på det faktiske OAuth-feilkodene `invalid_grant` / `invalid_token`
+ * i feilteksten fra `lib/fiken-oauth.ts`. IKKE på statuskoden alene – da ville
+ * `invalid_client` (feil client secret) og `invalid_request` også slått ut, og
+ * gitt alle brukere `FikenReauthRequiredError` ved en konfigfeil hos oss.
+ */
 function isInvalidGrant(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
-  return /invalid_grant|invalid_token|svarte 40[013]\b/i.test(err.message);
+  return /\binvalid_grant\b|\binvalid_token\b/i.test(err.message);
 }
 
 export async function getFikenClientForCurrentUser(): Promise<FikenClient> {
@@ -44,7 +63,7 @@ export async function getFikenClientForCurrentUser(): Promise<FikenClient> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error("Ikke innlogget.");
+  if (!user) throw new NotAuthenticatedError();
 
   const { data: conn, error } = await supabase
     .from("fiken_connection")
@@ -58,28 +77,55 @@ export async function getFikenClientForCurrentUser(): Promise<FikenClient> {
   let accessToken = conn.access_token as string;
   let expiresAt = new Date(conn.access_token_expires_at as string).getTime();
 
-  // Single-flight: dashboardet henter flere selskaper parallelt (Promise.all).
-  // Uten dette kan flere kall trigge hver sitt refreshTokens(), som roterer
-  // refresh-tokenet og dermed dreper tilkoblingen. Vi deler ett refresh-løfte.
+  let refreshToken = conn.refresh_token as string;
+
+  // Single-flight i denne prosessen: dashboardet henter flere selskaper
+  // parallelt (Promise.all). Uten dette kan flere kall trigge hver sitt
+  // refreshTokens(), som roterer refresh-tokenet og dermed dreper tilkoblingen.
+  // Vi deler ett refresh-løfte.
   let refreshInFlight: Promise<string> | null = null;
 
   async function doRefresh(): Promise<string> {
     let fresh;
     try {
       fresh = await refreshTokens({
-        refreshToken: conn!.refresh_token as string,
+        refreshToken,
         clientId: env.fikenClientId(),
         clientSecret: env.fikenClientSecret(),
       });
     } catch (err) {
-      if (isInvalidGrant(err)) throw new FikenReauthRequiredError();
-      throw err;
+      if (!isInvalidGrant(err)) throw err;
+
+      // Cross-request-race: en annen samtidig HTTP-request for samme bruker kan
+      // ha fornyet tokenet allerede, slik at refresh-tokenet vårt nå er rotert
+      // bort. `refreshInFlight` er lokal per kall og hjelper ikke på tvers av
+      // requests. Les raden på nytt: er refresh_token endret, bruk den friske
+      // raden. Bare hvis raden er uendret er tilkoblingen faktisk død.
+      const { data: freshRow, error: reloadError } = await supabase
+        .from("fiken_connection")
+        .select("access_token, refresh_token, access_token_expires_at")
+        .eq("id", conn!.id)
+        .maybeSingle();
+
+      if (reloadError) throw reloadError;
+
+      if (freshRow && (freshRow.refresh_token as string) !== refreshToken) {
+        refreshToken = freshRow.refresh_token as string;
+        accessToken = freshRow.access_token as string;
+        expiresAt = new Date(
+          freshRow.access_token_expires_at as string,
+        ).getTime();
+        return accessToken;
+      }
+
+      throw new FikenReauthRequiredError();
     }
 
     accessToken = fresh.accessToken;
     expiresAt = fresh.expiresAt;
+    refreshToken = fresh.refreshToken;
 
-    await supabase
+    const { error: updateError } = await supabase
       .from("fiken_connection")
       .update({
         access_token: fresh.accessToken,
@@ -88,6 +134,10 @@ export async function getFikenClientForCurrentUser(): Promise<FikenClient> {
         updated_at: new Date().toISOString(),
       })
       .eq("id", conn!.id);
+
+    // Skrivingen MÅ lykkes – ellers har Fiken rotert refresh-tokenet vekk uten
+    // at vi lagret det nye, og neste refresh vil feile. Kast heller nå.
+    if (updateError) throw updateError;
 
     return accessToken;
   }

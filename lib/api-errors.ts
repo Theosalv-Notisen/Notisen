@@ -3,10 +3,14 @@ import { FikenError } from "./fiken.ts";
 import {
   FikenReauthRequiredError,
   NoFikenConnectionError,
+  NotAuthenticatedError,
 } from "./fiken-connection.ts";
 
 /** Felles feil-til-JSON for Fiken-relaterte route handlers. */
 export function errorResponse(err: unknown) {
+  if (err instanceof NotAuthenticatedError) {
+    return NextResponse.json({ error: err.message }, { status: 401 });
+  }
   if (err instanceof NoFikenConnectionError) {
     return NextResponse.json({ error: err.message }, { status: 409 });
   }

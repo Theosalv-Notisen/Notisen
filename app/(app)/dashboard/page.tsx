@@ -32,7 +32,7 @@ type DashboardData =
   | { kind: "not_connected" }
   | { kind: "reauth" }
   | { kind: "fiken_error" }
-  | { kind: "error"; message: string };
+  | { kind: "error" };
 
 async function loadDashboard(): Promise<DashboardData> {
   try {
@@ -52,10 +52,8 @@ async function loadDashboard(): Promise<DashboardData> {
     if (err instanceof NoFikenConnectionError) return { kind: "not_connected" };
     if (err instanceof FikenReauthRequiredError) return { kind: "reauth" };
     if (err instanceof FikenError) return { kind: "fiken_error" };
-    return {
-      kind: "error",
-      message: err instanceof Error ? err.message : "Ukjent feil.",
-    };
+    console.error("Uventet feil ved lasting av dashboard:", err);
+    return { kind: "error" };
   }
 }
 
@@ -173,7 +171,7 @@ export default async function DashboardPage() {
       <div>
         <h1 className="text-2xl font-semibold">Oversikt</h1>
         <p className="mt-8 rounded-xl border border-black/10 p-6 text-sm opacity-75 dark:border-white/15">
-          Noe gikk galt: {data.message}
+          Noe gikk galt da vi hentet dataene dine. Prøv igjen om litt.
         </p>
       </div>
     );

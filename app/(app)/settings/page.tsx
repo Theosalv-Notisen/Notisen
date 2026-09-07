@@ -28,9 +28,10 @@ async function loadFikenStatus(): Promise<FikenStatus> {
         message: "Klarte ikke hente status fra Fiken akkurat nå.",
       };
     }
+    console.error("Uventet feil ved henting av Fiken-status:", err);
     return {
       kind: "error",
-      message: err instanceof Error ? err.message : "Ukjent feil.",
+      message: "Noe gikk galt da vi hentet Fiken-status. Prøv igjen om litt.",
     };
   }
 }
@@ -50,6 +51,7 @@ export default async function SettingsPage({
   searchParams,
 }: {
   searchParams: Promise<{ fiken?: string; fiken_error?: string }>;
+  // fiken: "connected" | "disconnected" | "disconnect_failed"
 }) {
   await requireUser("/settings");
   const { fiken, fiken_error } = await searchParams;
@@ -68,6 +70,11 @@ export default async function SettingsPage({
         <p className="mt-4 rounded-lg border border-black/15 bg-black/5 p-3 text-sm dark:border-white/20 dark:bg-white/10">
           Fiken-tilkoblingen er fjernet fra Notisen. Husk at du også må fjerne
           Notisen sin tilgang inne i Fiken hvis du vil trekke den helt tilbake.
+        </p>
+      ) : null}
+      {fiken === "disconnect_failed" ? (
+        <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+          Klarte ikke koble fra Fiken nå. Prøv igjen om litt.
         </p>
       ) : null}
       {fiken_error ? (

@@ -92,15 +92,25 @@ alter table public.supplier          enable row level security;
 alter table public.contract          enable row level security;
 alter table public.reminder_log      enable row level security;
 
+-- `drop policy if exists` foran hver `create policy` så hele fila kan
+-- re-kjøres uten "policy already exists"-feil.
+
+drop policy if exists "egne fiken_connection" on public.fiken_connection;
 create policy "egne fiken_connection" on public.fiken_connection
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+drop policy if exists "egne supplier" on public.supplier;
 create policy "egne supplier" on public.supplier
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+drop policy if exists "egne contract" on public.contract;
 create policy "egne contract" on public.contract
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+-- Ingen egen `with check` her: for en `for all`-policy uten `with check` bruker
+-- Postgres `using`-uttrykket også som `with check`. Altså kan man verken se
+-- eller sette inn en reminder_log som peker på en contract man ikke eier.
+drop policy if exists "egne reminder_log" on public.reminder_log;
 create policy "egne reminder_log" on public.reminder_log
   for all using (
     exists (

@@ -27,6 +27,18 @@ function readCredentials(formData: FormData) {
   };
 }
 
+/**
+ * Oversett Supabase-signup-feil til en kort kode. Sidene oversetter koden til
+ * norsk tekst. Vi lekker aldri rå `error.message` – bl.a. for å ikke bekrefte
+ * om en e-post allerede finnes.
+ */
+function signupFeilkode(message: string): string {
+  const m = message.toLowerCase();
+  if (m.includes("password")) return "svakt-passord";
+  if (m.includes("valid") && m.includes("email")) return "ugyldig-epost";
+  return "ukjent";
+}
+
 export async function signUp(formData: FormData) {
   const { email, password, next } = readCredentials(formData);
 
@@ -35,7 +47,7 @@ export async function signUp(formData: FormData) {
 
   if (error) {
     redirect(
-      `/signup?error=${encodeURIComponent(error.message)}&next=${encodeURIComponent(next)}`,
+      `/signup?feil=${signupFeilkode(error.message)}&next=${encodeURIComponent(next)}`,
     );
   }
 
@@ -49,9 +61,8 @@ export async function signIn(formData: FormData) {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    redirect(
-      `/login?error=${encodeURIComponent(error.message)}&next=${encodeURIComponent(next)}`,
-    );
+    // Alltid generisk: ikke avslør om e-posten finnes.
+    redirect(`/login?feil=ugyldig&next=${encodeURIComponent(next)}`);
   }
 
   redirect(next);

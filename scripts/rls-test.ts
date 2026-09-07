@@ -9,8 +9,16 @@
  *   NEXT_PUBLIC_SUPABASE_ANON_KEY
  *   SUPABASE_SERVICE_ROLE_KEY
  *
- * Lager to midlertidige testbrukere, sjekker at bruker B ikke kan se eller
- * endre bruker A sine rader, og rydder opp etterpå (inkl. cascade-sletting).
+ * Lager to midlertidige testbrukere, sjekker at bruker B verken kan se eller
+ * endre bruker A sine rader i alle fire tabellene, at en helt uinnlogget klient
+ * ikke ser noe, og rydder opp etterpå (inkl. cascade-sletting).
+ *
+ * Der B prøver update/delete på A sine rader er det ikke nok at B får
+ * `data.length === 0` – vi leser raden tilbake som service role og bekrefter at
+ * innholdet er UENDRET og at raden fortsatt finnes.
+ *
+ * Alle testdata får en nonce per kjøring, så rester etter en tidligere krasjet
+ * kjøring ikke gir falsk PASS/FAIL.
  */
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -23,6 +31,9 @@ const serviceKey = env.supabaseServiceRoleKey();
 const admin = createClient(url, serviceKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
+
+/** Kode Postgres gir ved brudd på en RLS-policy (insufficient_privilege). */
+const RLS_ERROR_CODE = "42501";
 
 let failures = 0;
 
@@ -56,31 +67,26 @@ async function signIn(email: string, password: string): Promise<SupabaseClient> 
   return client;
 }
 
-function fikenRow(userId: string) {
-  return {
-    user_id: userId,
-    access_token: "test-access-token",
-    refresh_token: "test-refresh-token",
-    access_token_expires_at: new Date(Date.now() + 3_600_000).toISOString(),
-  };
-}
-
-function supplierRow(userId: string) {
-  return {
-    user_id: userId,
-    fiken_contact_id: 999001,
-    name: "Testleverandør AS",
-  };
-}
-
 async function main() {
-  const stamp = Date.now();
-  const emailA = `rls-test-a-${stamp}@example.com`;
-  const emailB = `rls-test-b-${stamp}@example.com`;
-  const password = `pw-${stamp}-Aa1!`;
+  const nonce = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const emailA = `rls-test-a-${nonce}@example.com`;
+  const emailB = `rls-test-b-${nonce}@example.com`;
+  const password = `Aa1!-${nonce}`;
+
+  // Unike testdata per kjøring.
+  const accessTokenA = `test-access-${nonce}`;
+  const refreshTokenA = `test-refresh-${nonce}`;
+  const supplierNameA = `Testleverandør ${nonce}`;
+  const storagePathA = `test/${nonce}.pdf`;
 
   let userIdA: string | null = null;
   let userIdB: string | null = null;
+
+  // Fylles ut når A har opprettet radene sine.
+  let supplierRowIdA: string | null = null;
+  let fikenRowIdA: string | null = null;
+  let contractRowIdA: string | null = null;
+  let reminderRowIdA: string | null = null;
 
   try {
     userIdA = await createTestUser(emailA, password);
@@ -88,123 +94,253 @@ async function main() {
 
     const a = await signIn(emailA, password);
     const b = await signIn(emailB, password);
+    const anon = anonClient(); // IKKE innlogget
 
-    // 3. Bruker A skriver egne rader.
-    const insA1 = await a.from("fiken_connection").insert(fikenRow(userIdA));
-    check("A kan skrive egen fiken_connection", !insA1.error, insA1.error?.message);
-
-    const insA2 = await a.from("supplier").insert(supplierRow(userIdA));
-    check("A kan skrive egen supplier", !insA2.error, insA2.error?.message);
-
-    // 4. Bruker B ser ingenting av A sine rader.
-    const bFiken = await b.from("fiken_connection").select("id");
-    check(
-      "B ser 0 rader i fiken_connection",
-      !bFiken.error && (bFiken.data?.length ?? -1) === 0,
-      bFiken.error?.message ?? `fikk ${bFiken.data?.length}`,
-    );
-
-    const bSupplier = await b.from("supplier").select("id");
-    check(
-      "B ser 0 rader i supplier",
-      !bSupplier.error && (bSupplier.data?.length ?? -1) === 0,
-      bSupplier.error?.message ?? `fikk ${bSupplier.data?.length}`,
-    );
-
-    const bFilter = await b
-      .from("supplier")
+    // ── A oppretter sine egne rader i alle fire tabellene ──────────────────
+    const insFiken = await a
+      .from("fiken_connection")
+      .insert({
+        user_id: userIdA,
+        access_token: accessTokenA,
+        refresh_token: refreshTokenA,
+        access_token_expires_at: new Date(Date.now() + 3_600_000).toISOString(),
+      })
       .select("id")
-      .eq("user_id", userIdA);
-    check(
-      "B får 0 rader når den filtrerer på A sin user_id",
-      !bFilter.error && (bFilter.data?.length ?? -1) === 0,
-      bFilter.error?.message ?? `fikk ${bFilter.data?.length}`,
-    );
+      .single();
+    check("A kan skrive egen fiken_connection", !insFiken.error, insFiken.error?.message);
+    fikenRowIdA = insFiken.data?.id ?? null;
 
-    // 5. Bruker B kan ikke endre, slette eller forfalske A sine rader.
-    const bUpdate = await b
+    const insSupplier = await a
       .from("supplier")
-      .update({ name: "Kapret" })
-      .eq("user_id", userIdA)
-      .select("id");
-    check(
-      "B sin update på A sine rader endrer 0 rader",
-      !bUpdate.error && (bUpdate.data?.length ?? -1) === 0,
-      bUpdate.error?.message ?? `endret ${bUpdate.data?.length}`,
-    );
+      .insert({
+        user_id: userIdA,
+        fiken_contact_id: 999001,
+        name: supplierNameA,
+      })
+      .select("id")
+      .single();
+    check("A kan skrive egen supplier", !insSupplier.error, insSupplier.error?.message);
+    supplierRowIdA = insSupplier.data?.id ?? null;
 
-    const bDelete = await b
-      .from("supplier")
-      .delete()
-      .eq("user_id", userIdA)
-      .select("id");
-    check(
-      "B sin delete på A sine rader sletter 0 rader",
-      !bDelete.error && (bDelete.data?.length ?? -1) === 0,
-      bDelete.error?.message ?? `slettet ${bDelete.data?.length}`,
-    );
+    const insContract = await a
+      .from("contract")
+      .insert({
+        user_id: userIdA,
+        supplier_id: supplierRowIdA,
+        storage_path: storagePathA,
+        original_filename: `${nonce}.pdf`,
+      })
+      .select("id")
+      .single();
+    check("A kan skrive egen contract", !insContract.error, insContract.error?.message);
+    contractRowIdA = insContract.data?.id ?? null;
 
-    const bForge = await b.from("supplier").insert({
+    const insReminder = await a
+      .from("reminder_log")
+      .insert({
+        contract_id: contractRowIdA,
+        offset_days: 90,
+        deadline: "2026-12-01",
+      })
+      .select("id")
+      .single();
+    check(
+      "A kan skrive egen reminder_log (peker på egen contract)",
+      !insReminder.error,
+      insReminder.error?.message,
+    );
+    reminderRowIdA = insReminder.data?.id ?? null;
+
+    // ── B ser ingenting av A sine rader ───────────────────────────────────
+    for (const table of ["fiken_connection", "supplier", "contract", "reminder_log"]) {
+      const res = await b.from(table).select("id");
+      check(
+        `B ser 0 rader i ${table}`,
+        !res.error && (res.data?.length ?? -1) === 0,
+        res.error?.message ?? `fikk ${res.data?.length}`,
+      );
+    }
+
+    // ── B kan ikke filtrere seg til A sine rader ──────────────────────────
+    for (const table of ["fiken_connection", "supplier"]) {
+      const res = await b.from(table).select("id").eq("user_id", userIdA);
+      check(
+        `B får 0 rader når den filtrerer ${table} på A sin user_id`,
+        !res.error && (res.data?.length ?? -1) === 0,
+        res.error?.message ?? `fikk ${res.data?.length}`,
+      );
+    }
+
+    // ── Uinnlogget (anon) klient ser ingenting ────────────────────────────
+    for (const table of ["fiken_connection", "supplier", "contract", "reminder_log"]) {
+      const res = await anon.from(table).select("id");
+      check(
+        `Uinnlogget klient ser 0 rader i ${table}`,
+        !res.error && (res.data?.length ?? -1) === 0,
+        res.error?.message ?? `fikk ${res.data?.length}`,
+      );
+    }
+
+    // ── B kan ikke forfalske en insert med A sin user_id (RLS, ikke unik-brudd) ─
+    const forgeSupplier = await b.from("supplier").insert({
       user_id: userIdA,
-      fiken_contact_id: 999002,
-      name: "Forfalsket",
+      fiken_contact_id: 999777,
+      name: `Forfalsket ${nonce}`,
     });
     check(
-      "B kan ikke inserte en rad med A sin user_id (RLS-feil)",
-      !!bForge.error,
-      bForge.error ? "avvist som forventet" : "insert gikk gjennom!",
+      "B blir RLS-avvist ved insert av supplier med A sin user_id",
+      forgeSupplier.error?.code === RLS_ERROR_CODE,
+      forgeSupplier.error
+        ? `kode ${forgeSupplier.error.code}`
+        : "insert gikk gjennom!",
     );
 
-    // 6. Bruker A ser sine egne rader.
-    const aFiken = await a.from("fiken_connection").select("id");
+    const forgeFiken = await b.from("fiken_connection").insert({
+      user_id: userIdA,
+      access_token: `forfalsket-${nonce}`,
+      refresh_token: `forfalsket-${nonce}`,
+      access_token_expires_at: new Date(Date.now() + 3_600_000).toISOString(),
+    });
     check(
-      "A ser 1 rad i fiken_connection",
-      !aFiken.error && (aFiken.data?.length ?? -1) === 1,
-      aFiken.error?.message ?? `fikk ${aFiken.data?.length}`,
+      "B blir RLS-avvist ved insert av fiken_connection med A sin user_id",
+      forgeFiken.error?.code === RLS_ERROR_CODE,
+      forgeFiken.error ? `kode ${forgeFiken.error.code}` : "insert gikk gjennom!",
     );
 
-    const aSupplier = await a.from("supplier").select("id");
+    // ── B kan ikke sette inn en reminder_log som peker på A sin contract ──
+    const forgeReminder = await b.from("reminder_log").insert({
+      contract_id: contractRowIdA,
+      offset_days: 60,
+      deadline: "2026-11-01",
+    });
     check(
-      "A ser 1 rad i supplier",
-      !aSupplier.error && (aSupplier.data?.length ?? -1) === 1,
-      aSupplier.error?.message ?? `fikk ${aSupplier.data?.length}`,
+      "B blir RLS-avvist ved insert av reminder_log mot A sin contract",
+      forgeReminder.error?.code === RLS_ERROR_CODE,
+      forgeReminder.error
+        ? `kode ${forgeReminder.error.code}`
+        : "insert gikk gjennom!",
     );
 
-    // 7. Service role ser begge brukeres rader.
-    const allFiken = await admin
+    // ── B sin update/delete på A sine rader: bekreft UENDRET via service role ─
+    await b.from("supplier").update({ name: `Kapret ${nonce}` }).eq("user_id", userIdA);
+    const supplierAfter = await admin
+      .from("supplier")
+      .select("id, name")
+      .eq("id", supplierRowIdA)
+      .maybeSingle();
+    check(
+      "A sin supplier er uendret etter B sin update (lest som service role)",
+      !supplierAfter.error &&
+        supplierAfter.data?.name === supplierNameA,
+      supplierAfter.error?.message ?? `name = ${supplierAfter.data?.name}`,
+    );
+
+    await b
+      .from("fiken_connection")
+      .update({ access_token: `kapret-${nonce}` })
+      .eq("user_id", userIdA);
+    const fikenAfter = await admin
+      .from("fiken_connection")
+      .select("id, access_token")
+      .eq("id", fikenRowIdA)
+      .maybeSingle();
+    check(
+      "A sin fiken_connection er uendret etter B sin update (lest som service role)",
+      !fikenAfter.error && fikenAfter.data?.access_token === accessTokenA,
+      fikenAfter.error?.message ?? `access_token = ${fikenAfter.data?.access_token}`,
+    );
+
+    await b.from("supplier").delete().eq("user_id", userIdA);
+    await b.from("fiken_connection").delete().eq("user_id", userIdA);
+    const supplierStillThere = await admin
+      .from("supplier")
+      .select("id")
+      .eq("id", supplierRowIdA)
+      .maybeSingle();
+    const fikenStillThere = await admin
+      .from("fiken_connection")
+      .select("id")
+      .eq("id", fikenRowIdA)
+      .maybeSingle();
+    check(
+      "A sin supplier finnes fortsatt etter B sin delete",
+      !supplierStillThere.error && supplierStillThere.data?.id === supplierRowIdA,
+      supplierStillThere.error?.message ?? "borte!",
+    );
+    check(
+      "A sin fiken_connection finnes fortsatt etter B sin delete",
+      !fikenStillThere.error && fikenStillThere.data?.id === fikenRowIdA,
+      fikenStillThere.error?.message ?? "borte!",
+    );
+
+    // ── A ser sine egne rader ────────────────────────────────────────────
+    for (const [table, expected] of [
+      ["fiken_connection", 1],
+      ["supplier", 1],
+      ["contract", 1],
+      ["reminder_log", 1],
+    ] as const) {
+      const res = await a.from(table).select("id");
+      check(
+        `A ser ${expected} rad i ${table}`,
+        !res.error && (res.data?.length ?? -1) === expected,
+        res.error?.message ?? `fikk ${res.data?.length}`,
+      );
+    }
+
+    // ── Service role ser begge brukeres data ─────────────────────────────
+    const adminFiken = await admin
       .from("fiken_connection")
       .select("user_id")
-      .in("user_id", [userIdA, userIdB]);
+      .eq("id", fikenRowIdA);
     check(
       "Service role ser A sin fiken_connection-rad",
-      !allFiken.error && (allFiken.data?.length ?? 0) === 1,
-      allFiken.error?.message ?? `fikk ${allFiken.data?.length}`,
+      !adminFiken.error && (adminFiken.data?.length ?? 0) === 1,
+      adminFiken.error?.message ?? `fikk ${adminFiken.data?.length}`,
     );
 
-    // 8. Opprydding via cascade.
+    // ── Opprydding via cascade ───────────────────────────────────────────
     await admin.auth.admin.deleteUser(userIdA);
     userIdA = null;
     await admin.auth.admin.deleteUser(userIdB);
     userIdB = null;
 
-    // Bruker-ID-ene er borte nå, så vi leter etter testradene på innhold.
     const leftoverFiken = await admin
       .from("fiken_connection")
       .select("id")
-      .eq("access_token", "test-access-token");
+      .eq("access_token", accessTokenA);
     const leftoverSupplier = await admin
       .from("supplier")
       .select("id")
-      .eq("name", "Testleverandør AS");
+      .eq("name", supplierNameA);
+    const leftoverContract = await admin
+      .from("contract")
+      .select("id")
+      .eq("storage_path", storagePathA);
+    const leftoverReminder = await admin
+      .from("reminder_log")
+      .select("id")
+      .eq("id", reminderRowIdA ?? "00000000-0000-0000-0000-000000000000");
+
     check(
-      "Cascade slettet testens supplier-rader",
+      "Cascade slettet A sin fiken_connection",
+      !leftoverFiken.error && (leftoverFiken.data?.length ?? -1) === 0,
+      leftoverFiken.error?.message ?? `fant ${leftoverFiken.data?.length}`,
+    );
+    check(
+      "Cascade slettet A sin supplier",
       !leftoverSupplier.error && (leftoverSupplier.data?.length ?? -1) === 0,
       leftoverSupplier.error?.message ?? `fant ${leftoverSupplier.data?.length}`,
     );
     check(
-      "Cascade slettet testens fiken_connection-rader",
-      !leftoverFiken.error && (leftoverFiken.data?.length ?? -1) === 0,
-      leftoverFiken.error?.message ?? `fant ${leftoverFiken.data?.length}`,
+      "Cascade slettet A sin contract",
+      !leftoverContract.error && (leftoverContract.data?.length ?? -1) === 0,
+      leftoverContract.error?.message ?? `fant ${leftoverContract.data?.length}`,
+    );
+    check(
+      "Cascade slettet A sin reminder_log",
+      !leftoverReminder.error && (leftoverReminder.data?.length ?? -1) === 0,
+      leftoverReminder.error?.message ?? `fant ${leftoverReminder.data?.length}`,
     );
   } finally {
     // Sikkerhetsnett hvis testen brøt før opprydding.
@@ -212,7 +348,9 @@ async function main() {
     if (userIdB) await admin.auth.admin.deleteUser(userIdB).catch(() => {});
   }
 
-  console.log(`\n${failures === 0 ? "ALLE TESTER OK" : `${failures} TEST(ER) FEILET`}`);
+  console.log(
+    `\n${failures === 0 ? "ALLE TESTER OK" : `${failures} TEST(ER) FEILET`}`,
+  );
   process.exit(failures === 0 ? 0 : 1);
 }
 

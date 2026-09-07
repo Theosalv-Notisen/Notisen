@@ -4,13 +4,18 @@ import { signIn } from "../actions";
 /**
  * Innloggingsside. Server-komponent, poster til signIn-action.
  */
+const FEIL_TEKST: Record<string, string> = {
+  ugyldig: "Feil e-post eller passord.",
+};
+
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; error?: string }>;
+  searchParams: Promise<{ next?: string; feil?: string }>;
 }) {
-  const { next, error } = await searchParams;
+  const { next, feil } = await searchParams;
   const nextPath = next ?? "/dashboard";
+  const error = feil ? (FEIL_TEKST[feil] ?? "Innlogging feilet.") : null;
 
   return (
     <main className="mx-auto max-w-sm px-6 py-16">

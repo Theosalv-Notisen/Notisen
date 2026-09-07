@@ -5,13 +5,21 @@ import { signUp } from "../actions";
  * Registreringsside. Server-komponent, poster til signUp-action.
  * E-postbekreftelse er av i dev, så brukeren blir logget inn med en gang.
  */
+const FEIL_TEKST: Record<string, string> = {
+  "svakt-passord": "Passordet er for svakt. Bruk minst 6 tegn.",
+  "ugyldig-epost": "Ugyldig e-postadresse.",
+};
+
 export default async function SignupPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; error?: string }>;
+  searchParams: Promise<{ next?: string; feil?: string }>;
 }) {
-  const { next, error } = await searchParams;
+  const { next, feil } = await searchParams;
   const nextPath = next ?? "/dashboard";
+  const error = feil
+    ? (FEIL_TEKST[feil] ?? "Kunne ikke opprette bruker.")
+    : null;
 
   return (
     <main className="mx-auto max-w-sm px-6 py-16">
