@@ -36,6 +36,20 @@ async function loadFikenStatus(): Promise<FikenStatus> {
   }
 }
 
+/** Kortkoder fra OAuth-callback → norsk brukertekst. */
+function fikenErrorText(code: string): string {
+  switch (code) {
+    case "invalid_state":
+      return "Noe gikk galt underveis (utløpt eller ugyldig forsøk). Prøv å koble til på nytt.";
+    case "exchange_failed":
+      return "Klarte ikke fullføre tilkoblingen mot Fiken. Prøv igjen om litt.";
+    case "access_denied":
+      return "Tilgang ble ikke godkjent i Fiken.";
+    default:
+      return "Kobling til Fiken feilet. Prøv å koble til på nytt.";
+  }
+}
+
 function ConnectButton({ label }: { label: string }) {
   return (
     <a
@@ -79,7 +93,7 @@ export default async function SettingsPage({
       ) : null}
       {fiken_error ? (
         <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
-          Kobling til Fiken feilet: {fiken_error}
+          {fikenErrorText(fiken_error)}
         </p>
       ) : null}
 

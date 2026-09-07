@@ -57,7 +57,9 @@ export async function GET(request: Request) {
 
     return back("fiken=connected");
   } catch (err) {
-    const message = err instanceof Error ? err.message : "ukjent feil";
-    return back(`fiken_error=${encodeURIComponent(message)}`);
+    // Detaljen kan inneholde rå respons fra Fikens token-endepunkt – logg den,
+    // men vis kun en generisk kode til brukeren.
+    console.error("Fiken OAuth callback feilet:", err);
+    return back("fiken_error=exchange_failed");
   }
 }
