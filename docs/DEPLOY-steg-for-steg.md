@@ -172,39 +172,49 @@ Funker dette, er selve appen live. Mangler bare e-post (Del 4).
 
 # DEL 4 – E-postvarsler (Resend)
 
-Uten dette gjør appen alt annet, men sender ingen varsel-e-post.
+Du har allerede laget en Resend-konto og en API-nøkkel (`re_...`). Nå skal den kobles på og testes.
 
-## 4.1 Lag Resend-konto og nøkkel
+## 4.1 Sett riktige e-postverdier i Vercel
 
-1. <https://resend.com/signup> → registrer (bruk `theo1358@gmail.com`).
-2. Venstremeny → **API Keys** → **Create API Key**.
-   - **Name:** `notisen`
-   - **Permission:** `Sending access`
-   - **Create** → kopier `re_...`-strengen.
-3. Vercel → **Settings → Environment Variables** → finn `RESEND_API_KEY` → **Edit** → lim inn `re_...` → **Save**.
-4. **Deployments → ⋯ → Redeploy.**
+1. <https://vercel.com/dashboard> → prosjekt **notisen** → **Settings** (toppmeny) → **Environment Variables** (venstremeny).
+2. Finn **`RESEND_API_KEY`** → `⋯` → **Edit** → sett **Value** til din `re_...`-nøkkel (hele strengen) → **Save**.
+3. Finn **`REMINDER_FROM_EMAIL`** → `⋯` → **Edit** → sett **Value** til nøyaktig:
+   ```
+   onboarding@resend.dev
+   ```
+   (Sjekk stavemåten – `onboarding`, ikke `onbarding`.)
+4. **Deployments** (toppmeny) → øverste rad → `⋯` → **Redeploy** → **Redeploy**.
 
-Nå kan appen sende – men bare til `theo1358@gmail.com` (din egen konto-adresse), siden `REMINDER_FROM_EMAIL` er `onboarding@resend.dev`. Det holder for å teste at det virker.
+## 4.2 Viktig begrensning nå
 
-## 4.2 (Senere) Ekte avsenderadresse
+`onboarding@resend.dev` er Resends test-avsender. Den kan **kun sende til e-postadressen du registrerte Resend-kontoen med**.
+
+- Sjekk hvilken det er: <https://resend.com> → øverst til høyre / **Settings**.
+- Test-varsler kommer altså kun frem hvis Notisen-kontoen din har **samme e-postadresse** som Resend-kontoen.
+
+## 4.3 Send en ekte test-e-post
+
+1. Åpne `https://notisen.vercel.app/signup` → registrer deg med **samme e-post som Resend-kontoen din**.
+2. **Innstillinger → Koble til Fiken** → godkjenn.
+3. **Oversikt** → på en leverandør: **Last opp kontrakt** → velg en PDF (kan være hvilken som helst kontrakt) → **Kjør uttrekk** → vent → **Bekreft kontrakten**.
+4. På kontraktsiden, sjekk **Beregnet oppsigelsesfrist**. Står det en dato **innen 90 dager**? Da vil et varsel bli planlagt. Er den lenger unna, får du ikke e-post ennå (det er meningen).
+5. Trigg varsel-jobben manuelt. I Terminal (bytt inn `CRON_SECRET`-verdien fra `~/code/notisen/.env.local` – linja `CRON_SECRET=...`):
+   ```bash
+   curl -s -H "Authorization: Bearer DIN_CRON_SECRET" https://notisen.vercel.app/api/cron/reminders
+   ```
+   - Svar `{"ok":true,"processed":1,"emailsSent":1,...}` → e-post sendt.
+   - Svar `{"ok":true,"processed":0,...}` → ingen kontrakt med frist innen 90 dager (se punkt 4).
+   - Svar `Unauthorized` → feil `CRON_SECRET`.
+6. Sjekk innboksen (**og spam-mappa** – nye avsendere havner ofte der første gang).
+
+Etter dette går jobben automatisk hver morgen (07:00 UTC ≈ 08–09 norsk tid). Du ser kjøringene under Vercel → prosjektet → **Cron Jobs**, og resultatet under **Logs**.
+
+## 4.4 (Senere) Ekte avsenderadresse
 
 For å sende til andre enn deg selv må domenet `notisen.no` verifiseres:
 1. Resend → **Domains** → **Add Domain** → `notisen.no`.
 2. Resend viser noen DNS-oppføringer (DKIM, SPF). Legg dem inn hos den du kjøpte `notisen.no` av.
-3. Når status blir **Verified**: Vercel → sett `REMINDER_FROM_EMAIL` = `varsel@notisen.no` → Redeploy.
-
-## 4.3 Test at cron-en virker
-
-I Terminal (bytt inn din adresse og din `CRON_SECRET`-verdi fra `.env.local`):
-
-```bash
-curl -s -H "Authorization: Bearer DIN_CRON_SECRET" https://DIN-ADRESSE/api/cron/reminders
-```
-
-Svar `{"ok":true,"processed":0,...}` = alt virker (0 fordi ingen frist er innen 90 dager ennå).
-Svar `Unauthorized` = feil eller manglende `CRON_SECRET`.
-
-De to nattlige jobbene ser du under Vercel → prosjektet → **Cron Jobs** (`reminders` 07:00 UTC, `maintenance` 04:00 UTC).
+3. Når status blir **Verified**: Vercel → `REMINDER_FROM_EMAIL` = `varsel@notisen.no` → Redeploy.
 
 ---
 
