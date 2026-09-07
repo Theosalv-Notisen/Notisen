@@ -30,6 +30,7 @@ type ContractDetail = {
   extraction_error: string | null;
   needs_review: boolean;
   next_deadline: string | null;
+  deadline_rolled_at: string | null;
   llm_model: string | null;
   llm_raw: unknown;
   supplier: { name: string; organization_number: string | null } | null;
@@ -85,7 +86,7 @@ export default async function KontraktDetaljPage({
   const { data, error } = await supabase
     .from("contract")
     .select(
-      "id, status, updated_at, original_filename, contract_start, term_months, binding_until, auto_renews, renewal_date, notice_period_days, extraction_confidence, extraction_notes, extraction_error, needs_review, next_deadline, llm_model, llm_raw, supplier:supplier_id (name, organization_number)",
+      "id, status, updated_at, original_filename, contract_start, term_months, binding_until, auto_renews, renewal_date, notice_period_days, extraction_confidence, extraction_notes, extraction_error, needs_review, next_deadline, deadline_rolled_at, llm_model, llm_raw, supplier:supplier_id (name, organization_number)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -161,6 +162,16 @@ export default async function KontraktDetaljPage({
         <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
           Klarte ikke bekrefte kontrakten. Den finnes kanskje ikke lenger, eller
           du har ikke tilgang til den.
+        </p>
+      ) : null}
+
+      {c.deadline_rolled_at ? (
+        <p className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+          {c.next_deadline
+            ? `Forrige periodes oppsigelsesfrist er passert. Ny frist er beregnet til ${formatDeadline(
+                c.next_deadline,
+              )}. Sjekk at den stemmer – lagre på nytt for å bekrefte.`
+            : "Forrige frist er passert, og vi klarte ikke regne ut en ny (avtalen fornyes ikke automatisk, eller feltene er mangelfulle). Gå gjennom feltene og lagre, eller slett kontrakten hvis den er avsluttet."}
         </p>
       ) : null}
 

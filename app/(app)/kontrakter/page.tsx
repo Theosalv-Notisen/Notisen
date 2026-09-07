@@ -13,6 +13,7 @@ type ContractRow = {
   id: string;
   status: ContractStatus;
   next_deadline: string | null;
+  deadline_rolled_at: string | null;
   needs_review: boolean;
   original_filename: string | null;
   created_at: string;
@@ -26,7 +27,7 @@ export default async function KontrakterPage() {
   const { data, error } = await supabase
     .from("contract")
     .select(
-      "id, status, next_deadline, needs_review, original_filename, created_at, supplier:supplier_id (name)",
+      "id, status, next_deadline, deadline_rolled_at, needs_review, original_filename, created_at, supplier:supplier_id (name)",
     )
     .neq("status", "draft")
     .order("created_at", { ascending: false });
@@ -76,6 +77,11 @@ export default async function KontrakterPage() {
                 <div>
                   <dt className="opacity-60">Frist</dt>
                   <dd>{formatDeadline(c.next_deadline)}</dd>
+                  {c.deadline_rolled_at ? (
+                    <dd className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
+                      Frist rullet automatisk – sjekk
+                    </dd>
+                  ) : null}
                 </div>
                 <div>
                   <dt className="opacity-60">Fil</dt>

@@ -163,16 +163,20 @@ const cases: Case[] = [
 ];
 
 for (const c of cases) {
-  const result = computeNextDeadline(c.fields, c.today ?? TODAY);
+  const today = c.today ?? TODAY;
+  const result = computeNextDeadline(c.fields, today);
   const dateOk = result.date === c.expect;
   const reasonOk =
     !c.reasonIncludes || result.reason.includes(c.reasonIncludes);
+  // Invariant roll-forward hviler på: resultatet er ALLTID null eller en dato
+  // >= i dag. Brytes den, ruller maintenance-cronen kontrakten hver natt.
+  const guardOk = result.date === null || result.date >= today;
   check(
     c.name,
-    dateOk && reasonOk,
+    dateOk && reasonOk && guardOk,
     `fikk date=${JSON.stringify(result.date)} (forventet ${JSON.stringify(
       c.expect,
-    )}), reason="${result.reason}"`,
+    )}), reason="${result.reason}"${guardOk ? "" : " – BRYTER >= i dag-invarianten"}`,
   );
 }
 

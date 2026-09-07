@@ -26,6 +26,36 @@ export type DeadlineFields = {
 
 export type DeadlineResult = { date: string | null; reason: string };
 
+/**
+ * Rå snake_case-felt slik de ligger på `contract`-raden (og i Claude-uttrekket).
+ * Bevisst løs: alt kan være null.
+ */
+export type DeadlineRow = {
+  contract_start: string | null;
+  term_months: number | null;
+  binding_until: string | null;
+  auto_renews: boolean | null;
+  renewal_date: string | null;
+  notice_period_days: number | null;
+};
+
+/**
+ * Mapper en snake_case-rad (DB eller uttrekk) til camelCase-feltene
+ * `computeNextDeadline` forventer. Ren funksjon – ingen validering, ingen
+ * normalisering. Ett sted for mappingen så uttrekk, bekreftelse og roll-forward
+ * ikke driver fra hverandre.
+ */
+export function deadlineFieldsFromRow(row: DeadlineRow): DeadlineFields {
+  return {
+    contractStart: row.contract_start,
+    termMonths: row.term_months,
+    bindingUntil: row.binding_until,
+    autoRenews: row.auto_renews,
+    renewalDate: row.renewal_date,
+    noticePeriodDays: row.notice_period_days,
+  };
+}
+
 function parseDate(s: string): Date {
   return new Date(s + "T00:00:00Z");
 }

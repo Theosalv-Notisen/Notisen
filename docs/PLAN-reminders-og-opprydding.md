@@ -29,6 +29,7 @@ Laget av architect-agenten. Følges av coder → tester → manager. Dette gjør
   - **Rekkefølge: logg først, send så, slett logg ved feil.** Gir "minst én gang" med selvhelbredelse; unik-constraint hindrer dobbeltsending.
   - E-postmottaker: `supabase.auth.admin.getUserById(user_id)` → `data.user.email`, cachet per `user_id` i kjøringen.
   - `next_deadline` endres etter varsel: `reminder_log.deadline` fanger det → nye logg-rader, nytt varsel på ny plan. Gammel rad ufarlig.
+  - **Oppdatering (roll-forward, se `docs/PLAN-roll-forward.md`):** `next_deadline` re-beregnes nå daglig i maintenance-cronen (04:00) når en frist passerer, ikke bare ved uttrekk/bekreftelse. `reminder_log`-rader for frister eldre enn 400 dager ryddes samme sted.
   - Per-kontrakt `try/catch` — én feil stopper ikke resten. Returner `{ processed, emailsSent, backfilled, failed, errors[] }`.
 - **`app/api/cron/reminders/route.ts`** (omskriv stub): behold auth-sjekk nøyaktig (`cronSecretOptional()`, 401 aldri 500). `createAdminClient()`. Kall `runReminders(...)`. Topp-`try/catch` → uventet feil `console.error` + 500. `export const maxDuration = 60`. Behold `schedule: "0 7 * * *"`.
 
@@ -57,7 +58,9 @@ Laget av architect-agenten. Følges av coder → tester → manager. Dette gjør
 - **`lib/contract-maintenance.ts`** (ny, INGEN `server-only`): `runMaintenance(deps: { supabase, now, runExtraction, maxExtractions=3 })`:
   1. Fastlåste uttrekk: `status IN ('uploaded','processing') AND updated_at < now-15min`, maks 3/kjøring → `runExtraction(.., { force: true })`.
   2. Forlatte drafts: `status='draft' AND created_at < now-2t` → slett rad + best-effort storage-remove. Cap ~50.
-  3. **Foreldreløse filer: LOGG-ONLY i første omgang** (`console.log("orphan: …")`, ingen sletting) til Theodor har sett loggene en uke. Full sletting bak env-flag `ORPHAN_SWEEP_ENABLED` senere.
+  3. Roll-forward av frister (`docs/PLAN-roll-forward.md`): `status='confirmed' AND needs_review=false AND next_deadline < now-14d` → `computeNextDeadline` på nytt, skriv tilbake + `deadline_rolled_at`. Cap 500.
+  4. reminder_log-opprydding: `DELETE FROM reminder_log WHERE deadline < now-400d`.
+  5. **Foreldreløse filer: LOGG-ONLY i første omgang** (`console.log("orphan: …")`, ingen sletting) til Theodor har sett loggene en uke. Full sletting bak env-flag `ORPHAN_SWEEP_ENABLED` senere.
 - **`app/api/cron/maintenance/route.ts`**: auth identisk med reminders, `createAdminClient()`, `runMaintenance`, `maxDuration = 300`.
 
 ## Fase 6 – deleteContract

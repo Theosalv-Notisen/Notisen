@@ -13,7 +13,10 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { extractContractTerms } from "./contract-extract.ts";
-import { computeNextDeadline } from "./contract-deadline.ts";
+import {
+  computeNextDeadline,
+  deadlineFieldsFromRow,
+} from "./contract-deadline.ts";
 import { isStuckProcessing } from "./contract-status.ts";
 
 export type ExtractionContract = {
@@ -106,17 +109,7 @@ export async function runExtraction(
       today,
     );
 
-    const deadline = computeNextDeadline(
-      {
-        contractStart: fields.contract_start,
-        termMonths: fields.term_months,
-        bindingUntil: fields.binding_until,
-        autoRenews: fields.auto_renews,
-        renewalDate: fields.renewal_date,
-        noticePeriodDays: fields.notice_period_days,
-      },
-      today,
-    );
+    const deadline = computeNextDeadline(deadlineFieldsFromRow(fields), today);
 
     const needsReview =
       fields.extraction_confidence !== "high" || deadline.date === null;

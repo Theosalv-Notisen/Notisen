@@ -46,8 +46,17 @@ Vercel Cron (daglig 04:00)  ──►  /api/cron/maintenance   (lib/contract-mai
    1. fastlåste uttrekk (status uploaded/processing, updated_at eldre enn 15 min)
       ──►  runExtraction(force) på maks 3 per kjøring   (lib/contract-extract-run.ts)
    2. forlatte drafts (status 'draft', created_at eldre enn 2 t)  ──►  slett rad + PDF
-   3. foreldreløse storage-filer  ──►  LOGG-ONLY ("orphan: <sti>"), sletter ikke ennå
+   3. roll-forward av frister: confirmed + needs_review=false der next_deadline
+      passerte for > 14 dager siden  ──►  computeNextDeadline på nytt, skriv
+      resultatet tilbake + stemple deadline_rolled_at. Gir re-beregningen null:
+      next_deadline=null + needs_review=true (menneske ser på den én gang).
+   4. reminder_log-opprydding: slett logg-rader for frister eldre enn 400 dager.
+   5. foreldreløse storage-filer  ──►  LOGG-ONLY ("orphan: <sti>"), sletter ikke ennå
 ```
+
+`next_deadline` beregnes altså ikke bare ved uttrekk/bekreftelse – den rulles
+også fram daglig i maintenance-cronen når en frist passerer, så en årlig avtale
+fortsetter å varsle etter første fornyelse.
 
 ## "Gjentakende bilag" fra Fiken
 

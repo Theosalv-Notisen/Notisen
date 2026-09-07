@@ -152,3 +152,10 @@ alter table public.supplier drop constraint if exists supplier_user_company_cont
 alter table public.supplier
   add constraint supplier_user_company_contact_key
   unique (user_id, company_slug, fiken_contact_id);
+
+-- Roll-forward av oppsigelsesfrister: maintenance-cronen re-beregner
+-- next_deadline når den passerer og stempler tidspunktet her. UI-en viser en
+-- amber-notis så lenge feltet er satt; `confirmContract` nullstiller det.
+-- Eksisterende contract_next_deadline_idx dekker spørringen – ingen ny index.
+alter table public.contract
+  add column if not exists deadline_rolled_at timestamptz;

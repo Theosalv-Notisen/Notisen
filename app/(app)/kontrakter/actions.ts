@@ -3,7 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { computeNextDeadline } from "@/lib/contract-deadline";
+import {
+  computeNextDeadline,
+  deadlineFieldsFromRow,
+} from "@/lib/contract-deadline";
 import { deleteContractById } from "@/lib/delete-contract";
 import {
   normalizeBoolean,
@@ -87,17 +90,7 @@ export async function confirmContract(formData: FormData) {
     notice_period_days: norm.notice_period_days.value,
   };
 
-  const deadline = computeNextDeadline(
-    {
-      contractStart: fields.contract_start,
-      termMonths: fields.term_months,
-      bindingUntil: fields.binding_until,
-      autoRenews: fields.auto_renews,
-      renewalDate: fields.renewal_date,
-      noticePeriodDays: fields.notice_period_days,
-    },
-    today,
-  );
+  const deadline = computeNextDeadline(deadlineFieldsFromRow(fields), today);
 
   // `.select(...).maybeSingle()` gjør at vi ser om en rad faktisk ble oppdatert.
   // Bekrefter man en id som ikke finnes / ikke er sin egen → 0 rader, og da skal
@@ -108,6 +101,9 @@ export async function confirmContract(formData: FormData) {
     .update({
       ...fields,
       next_deadline: deadline.date,
+      // Brukeren har nå sett på feltene selv – nullstill roll-forward-markøren
+      // så «frist rullet automatisk»-notisen forsvinner.
+      deadline_rolled_at: null,
       // Uten en beregnet frist er kontrakten reelt umonitorert – behold
       // needs_review slik at varsel-cronen (som krever needs_review = false)
       // ikke plukker den opp, og si det tydelig til brukeren under.

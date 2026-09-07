@@ -12,6 +12,7 @@
     "rls:test": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/rls-test.ts",
     "storage-rls:test": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/storage-rls-test.ts",
     "reminders:test": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/reminders-test.ts",
+    "maintenance:test": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/maintenance-test.ts",
     "delete-contract:test": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/delete-contract-test.ts",
     "deadline:test": "node scripts/deadline-test.ts"
   },
