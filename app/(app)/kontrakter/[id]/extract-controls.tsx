@@ -73,6 +73,7 @@ export function ExtractControls({
         return;
       }
       setGaveUp(false);
+      setBusy(false);
       router.refresh();
     } catch {
       setError("Nettverksfeil. Prøv igjen.");

@@ -41,12 +41,18 @@ export async function POST(request: Request) {
     const form = await request.formData();
     const file = form.get("file");
     const companySlug = String(form.get("companySlug") ?? "").trim();
+    // Number("") og Number(null) er begge 0, så en manglende id ville ellers
+    // sluppet gjennom og feilet lenger nede med en misvisende feilmelding.
     const fikenContactId = Number(form.get("fikenContactId"));
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "Mangler fil." }, { status: 400 });
     }
-    if (!companySlug || !Number.isFinite(fikenContactId)) {
+    if (
+      !companySlug ||
+      !Number.isInteger(fikenContactId) ||
+      fikenContactId <= 0
+    ) {
       return NextResponse.json(
         { error: "Mangler selskap eller leverandør." },
         { status: 400 },
