@@ -14,8 +14,10 @@ import { env } from "@/lib/env";
  *   - send e-post, skriv reminder_log
  */
 export async function GET(request: Request) {
+  // Hent secret defensivt: mangler den, svarer vi 401 (ikke 500).
+  const secret = env.cronSecretOptional();
   const auth = request.headers.get("authorization");
-  if (auth !== `Bearer ${env.cronSecret()}`) {
+  if (!secret || auth !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

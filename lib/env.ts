@@ -35,4 +35,6 @@ export const env = {
   reminderFromEmail: () => optional("REMINDER_FROM_EMAIL") ?? "varsel@notisen.no",
 
   cronSecret: () => required("CRON_SECRET"),
+  /** Som cronSecret(), men kaster ikke – brukes der vi vil svare 401 selv om variabelen mangler. */
+  cronSecretOptional: () => optional("CRON_SECRET"),
 };

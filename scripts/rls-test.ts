@@ -38,7 +38,10 @@ const RLS_ERROR_CODE = "42501";
 let failures = 0;
 
 function check(label: string, ok: boolean, detail?: string) {
-  console.log(`${ok ? "PASS" : "FAIL"}  ${label}${detail ? ` – ${detail}` : ""}`);
+  // Vis detaljteksten kun ved FAIL – på PASS blir den ofte misvisende
+  // (den beskriver som regel feilscenarioet).
+  const suffix = !ok && detail ? ` – ${detail}` : "";
+  console.log(`${ok ? "PASS" : "FAIL"}  ${label}${suffix}`);
   if (!ok) failures++;
 }
 
@@ -162,7 +165,7 @@ async function main() {
     }
 
     // ── B kan ikke filtrere seg til A sine rader ──────────────────────────
-    for (const table of ["fiken_connection", "supplier"]) {
+    for (const table of ["fiken_connection", "supplier", "contract"]) {
       const res = await b.from(table).select("id").eq("user_id", userIdA);
       check(
         `B får 0 rader når den filtrerer ${table} på A sin user_id`,
@@ -250,8 +253,46 @@ async function main() {
       fikenAfter.error?.message ?? `access_token = ${fikenAfter.data?.access_token}`,
     );
 
+    await b
+      .from("contract")
+      .update({ status: "confirmed", storage_path: `kapret/${nonce}.pdf` })
+      .eq("user_id", userIdA);
+    const contractAfter = await admin
+      .from("contract")
+      .select("id, status, storage_path")
+      .eq("id", contractRowIdA)
+      .maybeSingle();
+    check(
+      "A sin contract er uendret etter B sin update (lest som service role)",
+      !contractAfter.error &&
+        contractAfter.data?.status === "uploaded" &&
+        contractAfter.data?.storage_path === storagePathA,
+      contractAfter.error?.message ??
+        `status = ${contractAfter.data?.status}, storage_path = ${contractAfter.data?.storage_path}`,
+    );
+
+    await b
+      .from("reminder_log")
+      .update({ offset_days: 30, deadline: "2000-01-01" })
+      .eq("id", reminderRowIdA);
+    const reminderAfter = await admin
+      .from("reminder_log")
+      .select("id, offset_days, deadline")
+      .eq("id", reminderRowIdA)
+      .maybeSingle();
+    check(
+      "A sin reminder_log er uendret etter B sin update (lest som service role)",
+      !reminderAfter.error &&
+        reminderAfter.data?.offset_days === 90 &&
+        reminderAfter.data?.deadline === "2026-12-01",
+      reminderAfter.error?.message ??
+        `offset_days = ${reminderAfter.data?.offset_days}, deadline = ${reminderAfter.data?.deadline}`,
+    );
+
     await b.from("supplier").delete().eq("user_id", userIdA);
     await b.from("fiken_connection").delete().eq("user_id", userIdA);
+    await b.from("reminder_log").delete().eq("id", reminderRowIdA);
+    await b.from("contract").delete().eq("user_id", userIdA);
     const supplierStillThere = await admin
       .from("supplier")
       .select("id")
@@ -262,6 +303,16 @@ async function main() {
       .select("id")
       .eq("id", fikenRowIdA)
       .maybeSingle();
+    const contractStillThere = await admin
+      .from("contract")
+      .select("id, status, storage_path")
+      .eq("id", contractRowIdA)
+      .maybeSingle();
+    const reminderStillThere = await admin
+      .from("reminder_log")
+      .select("id, offset_days, deadline")
+      .eq("id", reminderRowIdA)
+      .maybeSingle();
     check(
       "A sin supplier finnes fortsatt etter B sin delete",
       !supplierStillThere.error && supplierStillThere.data?.id === supplierRowIdA,
@@ -271,6 +322,22 @@ async function main() {
       "A sin fiken_connection finnes fortsatt etter B sin delete",
       !fikenStillThere.error && fikenStillThere.data?.id === fikenRowIdA,
       fikenStillThere.error?.message ?? "borte!",
+    );
+    check(
+      "A sin contract finnes fortsatt og er uendret etter B sin delete",
+      !contractStillThere.error &&
+        contractStillThere.data?.id === contractRowIdA &&
+        contractStillThere.data?.status === "uploaded" &&
+        contractStillThere.data?.storage_path === storagePathA,
+      contractStillThere.error?.message ?? "borte eller endret!",
+    );
+    check(
+      "A sin reminder_log finnes fortsatt og er uendret etter B sin delete",
+      !reminderStillThere.error &&
+        reminderStillThere.data?.id === reminderRowIdA &&
+        reminderStillThere.data?.offset_days === 90 &&
+        reminderStillThere.data?.deadline === "2026-12-01",
+      reminderStillThere.error?.message ?? "borte eller endret!",
     );
 
     // ── A ser sine egne rader ────────────────────────────────────────────
