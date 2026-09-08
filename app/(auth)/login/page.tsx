@@ -13,16 +13,25 @@ import { inputClass, labelClass } from "@/components/ui/field";
 const FEIL_TEKST: Record<string, string> = {
   ugyldig: "Feil e-post eller passord.",
   tomt: "Fyll ut både e-post og passord.",
+  reset_ugyldig:
+    "Lenken for å tilbakestille passord var ugyldig eller utløpt. Be om en ny.",
 };
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; feil?: string; slettet?: string }>;
+  searchParams: Promise<{
+    next?: string;
+    feil?: string;
+    slettet?: string;
+    passord_oppdatert?: string;
+  }>;
 }) {
-  const { next, feil, slettet } = await searchParams;
-  // Allerede innlogget → rett til dashbordet (men behold ?slettet=1-kvitteringen).
-  if (!slettet && (await getCurrentUser())) redirect("/dashboard");
+  const { next, feil, slettet, passord_oppdatert } = await searchParams;
+  // Allerede innlogget → rett til dashbordet (men behold kvitteringene).
+  if (!slettet && !passord_oppdatert && (await getCurrentUser())) {
+    redirect("/dashboard");
+  }
   const nextPath = next ?? "/dashboard";
   const error = feil ? (FEIL_TEKST[feil] ?? "Innlogging feilet.") : null;
 
@@ -50,6 +59,12 @@ export default async function LoginPage({
         </Alert>
       ) : null}
 
+      {passord_oppdatert ? (
+        <Alert variant="good" className="mt-4">
+          Passordet er oppdatert. Logg inn med det nye passordet.
+        </Alert>
+      ) : null}
+
       <form action={signIn} className="mt-6 space-y-4">
         <input type="hidden" name="next" value={nextPath} />
 
@@ -74,6 +89,12 @@ export default async function LoginPage({
             className={inputClass}
           />
         </label>
+
+        <div className="text-sm">
+          <Link href="/glemt-passord" className="text-accent underline">
+            Glemt passord?
+          </Link>
+        </div>
 
         <button type="submit" className={btnPrimary + " w-full"}>
           Logg inn

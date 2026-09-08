@@ -15,6 +15,7 @@ import {
 import { Alert } from "@/components/ui/alert";
 import { btnPrimary, btnSecondarySm } from "@/components/ui/button-styles";
 import { card, cardTight } from "@/components/ui/card";
+import { fikenDataTag } from "@/lib/cache-tags";
 
 export const dynamic = "force-dynamic";
 
@@ -66,7 +67,7 @@ function loadFikenData(userId: string) {
       );
     },
     ["dashboard-fiken", userId],
-    { revalidate: 180 },
+    { revalidate: 180, tags: [fikenDataTag(userId)] },
   );
 }
 

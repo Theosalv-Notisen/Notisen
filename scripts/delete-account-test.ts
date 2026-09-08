@@ -90,7 +90,7 @@ async function seedUser(
   client: SupabaseClient,
   userId: string,
   nonce: string,
-): Promise<{ storagePath: string; contractId: string }> {
+): Promise<{ storagePath: string; contractId: string; reminderId: string }> {
   const storagePath = `${userId}/${nonce}.pdf`;
 
   const up = await client.storage.from(BUCKET).upload(storagePath, PDF_BYTES, {
@@ -138,6 +138,7 @@ async function seedUser(
   if (insReminder.error) {
     throw new Error(`reminder_log-insert feilet: ${insReminder.error.message}`);
   }
+  const reminderId = insReminder.data.id as string;
 
   const insConn = await admin.from("fiken_connection").insert({
     user_id: userId,
@@ -151,7 +152,22 @@ async function seedUser(
     throw new Error(`fiken_connection-insert feilet: ${insConn.error.message}`);
   }
 
-  return { storagePath, contractId };
+  return { storagePath, contractId, reminderId };
+}
+
+/**
+ * Antall rader i `auth.identities` for en bruker. Krever at `auth`-skjemaet er
+ * eksponert for service-role via PostgREST. Er det ikke det, returnerer vi
+ * `null` og hopper over sjekken (i stedet for en falsk FAIL).
+ */
+async function identityCount(userId: string): Promise<number | null> {
+  const { data, error } = await admin
+    .schema("auth")
+    .from("identities")
+    .select("id")
+    .eq("user_id", userId);
+  if (error) return null;
+  return (data ?? []).length;
 }
 
 /** Rad-tellinger for en bruker via service role (går forbi RLS). */
@@ -215,6 +231,15 @@ async function main() {
       JSON.stringify(beforeA),
     );
 
+    const identitiesBeforeA = await identityCount(userIdA);
+    check(
+      "1b. A har minst én rad i auth.identities (før sletting)",
+      identitiesBeforeA === null || identitiesBeforeA >= 1,
+      identitiesBeforeA === null
+        ? "auth-skjema ikke eksponert – hoppet over"
+        : `identities=${identitiesBeforeA}`,
+    );
+
     const beforeB = await rowCounts(userIdB, seedB.contractId);
     check(
       "2. B er seedet tilsvarende",
@@ -255,6 +280,41 @@ async function main() {
       "4c. getUserById(A) gir ingen bruker",
       !gotA.data.user,
       gotA.data.user ? "brukeren finnes fortsatt" : undefined,
+    );
+
+    // 4d. Hard delete, ikke soft delete: innlogging med A sine gamle
+    //     legitimasjoner må feile.
+    const loginAfter = anonClient();
+    const loginRes = await loginAfter.auth.signInWithPassword({
+      email: emailA,
+      password,
+    });
+    check(
+      "4d. Innlogging med A sine gamle legitimasjoner feiler (hard delete)",
+      !!loginRes.error && !loginRes.data.session,
+      loginRes.error ? undefined : "fikk fortsatt en sesjon!",
+    );
+
+    // 4e. Selve reminder_log-raden (slått opp på sin egen id) er borte –
+    //     ikke bare «matcher ikke contract_id lenger».
+    const reminderRow = await admin
+      .from("reminder_log")
+      .select("id")
+      .eq("id", seedA.reminderId);
+    check(
+      "4e. reminder_log-raden til A er fysisk slettet (cascade via contract)",
+      (reminderRow.data?.length ?? -1) === 0,
+      JSON.stringify(reminderRow.data),
+    );
+
+    // 4f. auth.identities for A er tømt (best effort).
+    const identitiesAfterA = await identityCount(userIdA);
+    check(
+      "4f. 0 rader igjen for A i auth.identities",
+      identitiesAfterA === null || identitiesAfterA === 0,
+      identitiesAfterA === null
+        ? "auth-skjema ikke eksponert – hoppet over"
+        : `identities=${identitiesAfterA}`,
     );
 
     // ── 5. B er HELT urørt ───────────────────────────────────────────

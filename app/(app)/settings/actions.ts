@@ -1,9 +1,11 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { deleteAccountData } from "@/lib/delete-account";
+import { fikenDataTag } from "@/lib/cache-tags";
 
 /**
  * Sletter den innloggede brukerens konto permanent: alle PDF-er i storage
@@ -48,6 +50,10 @@ export async function deleteAccount(formData: FormData) {
       redirect("/settings?slett_feil=1");
     }
   }
+
+  // Tøm den cachede Fiken-oversikten for brukeren med én gang, i stedet for å
+  // la den ligge i inntil `revalidate`-vinduet (3 min) etter at kontoen er slettet.
+  revalidateTag(fikenDataTag(user.id));
 
   await supabase.auth.signOut();
   redirect("/login?slettet=1");
