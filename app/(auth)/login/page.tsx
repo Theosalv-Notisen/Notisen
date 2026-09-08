@@ -11,9 +11,9 @@ const FEIL_TEKST: Record<string, string> = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; feil?: string }>;
+  searchParams: Promise<{ next?: string; feil?: string; slettet?: string }>;
 }) {
-  const { next, feil } = await searchParams;
+  const { next, feil, slettet } = await searchParams;
   const nextPath = next ?? "/dashboard";
   const error = feil ? (FEIL_TEKST[feil] ?? "Innlogging feilet.") : null;
 
@@ -27,6 +27,14 @@ export default async function LoginPage({
       {error ? (
         <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
           {error}
+        </p>
+      ) : null}
+
+      {slettet ? (
+        <p className="mt-4 rounded-lg border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-700 dark:text-green-300">
+          Kontoen din er slettet. All data og alle opplastede filer er fjernet
+          permanent. Husk at du også må fjerne Notisen sin tilgang inne i Fiken
+          hvis du vil trekke den helt tilbake.
         </p>
       ) : null}
 

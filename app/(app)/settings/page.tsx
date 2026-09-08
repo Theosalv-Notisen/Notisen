@@ -5,6 +5,7 @@ import {
   NoFikenConnectionError,
 } from "@/lib/fiken-connection";
 import { FikenError } from "@/lib/fiken";
+import { DeleteAccountForm } from "./delete-account-form";
 
 export const dynamic = "force-dynamic";
 
@@ -64,11 +65,15 @@ function ConnectButton({ label }: { label: string }) {
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ fiken?: string; fiken_error?: string }>;
+  searchParams: Promise<{
+    fiken?: string;
+    fiken_error?: string;
+    slett_feil?: string;
+  }>;
   // fiken: "connected" | "disconnected" | "disconnect_failed"
 }) {
-  await requireUser("/settings");
-  const { fiken, fiken_error } = await searchParams;
+  const user = await requireUser("/settings");
+  const { fiken, fiken_error, slett_feil } = await searchParams;
   const status = await loadFikenStatus();
 
   return (
@@ -94,6 +99,13 @@ export default async function SettingsPage({
       {fiken_error ? (
         <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
           {fikenErrorText(fiken_error)}
+        </p>
+      ) : null}
+      {slett_feil ? (
+        <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+          {slett_feil === "bekreftelse"
+            ? "E-posten du skrev inn stemmer ikke."
+            : "Klarte ikke slette kontoen nå. Ingenting er slettet – prøv igjen om litt."}
         </p>
       ) : null}
 
@@ -145,6 +157,22 @@ export default async function SettingsPage({
             <ConnectButton label="Koble til Fiken" />
           </div>
         ) : null}
+      </section>
+
+      {/* ── Faresone ──────────────────────────────────────────────── */}
+      <section className="mt-16 border-t border-red-500/20 pt-6">
+        <h2 className="text-sm font-semibold text-red-700 dark:text-red-300">
+          Faresone
+        </h2>
+        <p className="mt-1 text-xs opacity-60">
+          Sletting fjerner kontoen din, alle kontrakter, alle leverandører og
+          alle opplastede PDF-er permanent. Dette kan ikke angres. Husk at du
+          også må fjerne Notisen sin tilgang inne i Fiken hvis du vil trekke den
+          helt tilbake.
+        </p>
+        <div className="mt-3">
+          <DeleteAccountForm email={user.email!} />
+        </div>
       </section>
     </div>
   );
