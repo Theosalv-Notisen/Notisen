@@ -44,7 +44,7 @@ Vercel Cron (daglig 07:00)  ──►  /api/cron/reminders   (lib/reminders.ts)
 
 Vercel Cron (daglig 04:00)  ──►  /api/cron/maintenance   (lib/contract-maintenance.ts)
    1. fastlåste uttrekk (status uploaded/processing, updated_at eldre enn 15 min)
-      ──►  runExtraction(force) på maks 3 per kjøring   (lib/contract-extract-run.ts)
+      ──►  runExtraction(force) på maks 2 per kjøring   (lib/contract-extract-run.ts)
    2. forlatte drafts (status 'draft', created_at eldre enn 2 t)  ──►  slett rad + PDF
    3. roll-forward av frister: confirmed + needs_review=false der next_deadline
       passerte for > 14 dager siden  ──►  computeNextDeadline på nytt, skriv

@@ -36,6 +36,9 @@ export async function GET(request: Request) {
       now: new Date(),
       runExtraction,
     });
+    // Logg oppsummeringen så den er synlig i Vercel-loggen (tellere for
+    // roll-forward, draft-opprydding osv. + evt. `errors`).
+    console.log("maintenance-cron:", JSON.stringify(summary));
     return NextResponse.json({ ok: true, ...summary });
   } catch (err) {
     console.error("Maintenance-cron feilet uventet:", err);
