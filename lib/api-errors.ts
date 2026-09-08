@@ -23,7 +23,8 @@ export function errorResponse(err: unknown) {
   }
   if (err instanceof TokenDecryptError) {
     // Drift-/konfigfeil (feil eller manglende TOKEN_ENC_KEY). Ikke noe brukeren
-    // fikser med reconnect – ikke lekk detaljer.
+    // fikser med reconnect – ikke lekk detaljer, men logg så det kan diagnostiseres.
+    console.error("TokenDecryptError i Fiken-route:", err);
     return NextResponse.json(
       {
         error:

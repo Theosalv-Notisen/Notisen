@@ -83,7 +83,7 @@ Gå til <https://github.com/Theosalv-Notisen/notisen> – du skal se alle mappen
 
 Fortsatt på «Configure Project»-siden, klikk for å utvide **Environment Variables**.
 
-Du legger inn **11 variabler**, én av gangen: skriv navnet i **Key**-feltet, verdien i **Value**-feltet, klikk **Add**.
+Du legger inn **12 variabler**, én av gangen: skriv navnet i **Key**-feltet, verdien i **Value**-feltet, klikk **Add**.
 
 Verdiene ligger i to filer på maskinen din. Åpne dem i tekstredigering med:
 
@@ -103,6 +103,7 @@ open -e ~/code/notisen/.env.local
 | `FIKEN_CLIENT_SECRET` | fra `.env` |
 | `ANTHROPIC_API_KEY` | fra `.env.local` |
 | `CRON_SECRET` | fra `.env.local` |
+| `TOKEN_ENC_KEY` | fra `.env.local` — **sett samme verdi på både Production og Preview.** Krypterer Fiken-tokens. Ta backup i passordmanager: mister du den må alle koble til Fiken på nytt. |
 
 (Kopier alt etter `=`-tegnet på hver linje. Ikke ta med `NAVN=`-delen.)
 

@@ -50,10 +50,12 @@ Project → **Settings → Environment Variables**. Legg inn alle under, for **P
 | `REMINDER_FROM_EMAIL` | `varsel@notisen.no` (eller `onboarding@resend.dev` for test) | – |
 | `APP_URL` | **`https://DIN-URL`** ← ny | brukes til lenker i e-post |
 | `CRON_SECRET` | (fra `.env.local` – eller generer en ny lang tilfeldig streng) | Vercel sender den som `Authorization: Bearer …` til cron-rutene |
+| `TOKEN_ENC_KEY` | (fra `.env.local`) ← ny | krypterer Fiken-tokens i databasen – se under |
 
 Merk:
 - `NEXT_PUBLIC_`-variablene bakes inn i klient-bundlen – det er OK, de er offentlige by design (RLS beskytter data).
-- `SUPABASE_SERVICE_ROLE_KEY`, `FIKEN_CLIENT_SECRET`, `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `CRON_SECRET` er hemmelige – aldri `NEXT_PUBLIC_`.
+- `SUPABASE_SERVICE_ROLE_KEY`, `FIKEN_CLIENT_SECRET`, `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `CRON_SECRET`, `TOKEN_ENC_KEY` er hemmelige – aldri `NEXT_PUBLIC_`.
+- **`TOKEN_ENC_KEY`:** `openssl rand -base64 32`. Sett SAMME verdi på **både Production og Preview** (Preview deler prod-databasen). **Ta backup i en passordmanager** – mister du den, må alle brukere koble til Fiken på nytt. Etter første deploy: kjør `npm run encrypt-tokens:migrate` lokalt (med prod-verdier i `.env.local`) for å kryptere eksisterende rader, og koble til Fiken på nytt én gang så gamle klartekst-tokens i databasebackups blir verdiløse.
 
 ## 5. Fiken: registrer prod-callback
 
