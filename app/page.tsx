@@ -1,34 +1,128 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Logo } from "@/components/brand/logo";
-import { btnPrimary, btnSecondary } from "@/components/ui/button-styles";
+import {
+  btnPrimary,
+  btnSecondary,
+  btnSecondarySm,
+} from "@/components/ui/button-styles";
+
+export const metadata: Metadata = {
+  title: "Notisen – påminnelser om oppsigelsesfrister",
+  description:
+    "Notisen kobler seg til Fiken, finner de løpende leverandøravtalene dine og varsler deg i god tid før oppsigelsesfristen løper ut.",
+};
+
+const STEG = [
+  {
+    tittel: "Koble til Fiken",
+    tekst: "Koble til din bedrifts Fiken-regnskap med noen få klikk.",
+  },
+  {
+    tittel: "Finn de løpende avtalene",
+    tekst:
+      "Notisen oppdager tilbakevendende leverandørbetalinger som kan tyde på løpende avtaler.",
+  },
+  {
+    tittel: "Last opp kontraktene",
+    tekst:
+      "Last opp kontraktene dine – vi leser ut fornyelses- og oppsigelsesfrister automatisk med KI.",
+  },
+  {
+    tittel: "Få påminnelse i tide",
+    tekst:
+      "Du får en e-postpåminnelse i god tid før fristen løper ut – 90, 60 og 30 dager før.",
+  },
+];
 
 export default function Home() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center px-6 py-16">
-      <Logo size="lg" />
+    <div className="flex min-h-screen flex-col">
+      <header className="border-b border-border">
+        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
+          <Logo size="sm" />
+          <Link href="/login" className={btnSecondarySm}>
+            Logg inn
+          </Link>
+        </div>
+      </header>
 
-      <h1 className="mt-8 text-3xl font-bold tracking-tight">
-        Aldri gå glipp av en oppsigelsesfrist igjen.
-      </h1>
-      <p className="mt-3 text-lg text-ink-secondary">
-        Notisen holder styr på oppsigelsesfrister og bindingstid for
-        leverandøravtalene dine, og varsler deg i god tid.
-      </p>
+      <main className="flex-1">
+        <section className="mx-auto max-w-4xl px-6 py-16 sm:py-24">
+          <h1 className="max-w-2xl text-3xl font-bold tracking-tight sm:text-4xl">
+            Hold oversikt over oppsigelsesfristene i bedriftens avtaler.
+          </h1>
+          <p className="mt-4 max-w-2xl text-lg text-ink-secondary">
+            Notisen kobler seg til regnskapet ditt i Fiken, finner de løpende
+            leverandøravtalene, og minner deg på i god tid før du blir bundet for
+            et nytt år.
+          </p>
+          <div className="mt-8">
+            <Link href="/signup" className={btnPrimary}>
+              Kom i gang
+            </Link>
+          </div>
+        </section>
 
-      <div className="mt-8 flex flex-wrap gap-3">
-        <Link href="/signup" className={btnPrimary}>
-          Kom i gang
-        </Link>
-        <Link href="/login" className={btnSecondary}>
-          Logg inn
-        </Link>
-      </div>
+        <section className="border-t border-border">
+          <div className="mx-auto max-w-4xl px-6 py-16">
+            <h2 className="text-xl font-bold tracking-tight">
+              Slik fungerer det
+            </h2>
+            <ol className="mt-8 grid gap-4 sm:grid-cols-2">
+              {STEG.map((steg, i) => (
+                <li
+                  key={steg.tittel}
+                  className="rounded-xl border border-border bg-surface p-5"
+                >
+                  <span className="text-sm font-bold tabular-nums text-accent">
+                    {i + 1}
+                  </span>
+                  <h3 className="mt-1 font-medium">{steg.tittel}</h3>
+                  <p className="mt-1 text-sm text-ink-secondary">{steg.tekst}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
 
-      <ul className="mt-10 space-y-2 text-sm text-ink-secondary">
-        <li>Henter leverandørene dine fra Fiken automatisk.</li>
-        <li>Leser opplastede kontrakter og foreslår en oppsigelsesfrist.</li>
-        <li>Sender e-postvarsel 90, 60 og 30 dager før fristen.</li>
-      </ul>
-    </main>
+        <section className="mx-auto max-w-4xl px-6 py-16">
+          <h2 className="text-xl font-bold tracking-tight">Hvorfor Notisen?</h2>
+          <p className="mt-4 max-w-2xl text-ink-secondary">
+            En oppsigelsesfrist er lett å glemme. Mange avtaler fornyes
+            automatisk for et helt år hvis de ikke sies opp innen en frist som
+            gjerne ligger to–tre måneder før fornyelsen. Da sitter bedriften
+            bundet til noe den egentlig ville avslutte. Notisen holder styr på
+            fristene, så du slipper.
+          </p>
+        </section>
+
+        <section className="border-t border-border">
+          <div className="mx-auto max-w-4xl px-6 py-16">
+            <h2 className="text-xl font-bold tracking-tight">
+              Kom i gang med Notisen
+            </h2>
+            <p className="mt-2 text-ink-secondary">
+              Det tar et par minutter å koble til Fiken.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link href="/signup" className={btnPrimary}>
+                Kom i gang
+              </Link>
+              <Link href="/login" className={btnSecondary}>
+                Logg inn
+              </Link>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer className="border-t border-border">
+        <div className="mx-auto flex max-w-4xl flex-col gap-3 px-6 py-8 text-sm text-ink-tertiary sm:flex-row sm:items-center sm:justify-between">
+          <Logo size="sm" />
+          <p>Påminnelser om oppsigelsesfrister for bedriftsavtaler.</p>
+        </div>
+      </footer>
+    </div>
   );
 }
