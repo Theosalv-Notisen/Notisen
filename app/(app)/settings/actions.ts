@@ -37,8 +37,12 @@ export async function deleteAccount(formData: FormData) {
   } catch (err) {
     const msg = err instanceof Error ? err.message.toLowerCase() : "";
     // Dobbeltklikk / retry: første kall slettet allerede brukeren, andre kall
-    // får «User not found». Da ER kontoen borte – behandle som suksess.
-    const alreadyGone = /not found|user_not_found|does not exist/.test(msg);
+    // får en "slette bruker … not found"-feil fra deleteUser. Da ER kontoen
+    // borte – behandle som suksess. (Storage-feil har en annen, spesifikk
+    // melding uten "not found", så den treffer ikke her.)
+    const alreadyGone =
+      msg.includes("slette bruker") &&
+      /not found|user_not_found|does not exist/.test(msg);
     if (!alreadyGone) {
       console.error("Sletting av konto feilet for bruker", user.id, err);
       redirect("/settings?slett_feil=1");

@@ -6,10 +6,13 @@
 Bruker logger inn (Supabase Auth)
         │
         ▼
-Legger inn Fiken personlig API-nøkkel  ──►  fiken_connection (Supabase)
+"Koble til Fiken"  ──►  OAuth authorization-code-flyt  ──►  fiken_connection (Supabase)
+   access-/refresh-token krypteres (AES-256-GCM) før de lagres.
+   access-token refreshes automatisk i lib/fiken-connection.ts.
         │
         ▼
-"Synk fra Fiken"  ──►  GET /companies, /contacts?supplier=true  ──►  supplier-tabellen
+Dashboard  ──►  GET /companies, /contacts?supplier=true, /purchases
+   lib/recurring.ts vurderer hvilke leverandører som ser ut som løpende avtaler
         │
         ▼
 Bruker laster opp kontrakt-PDF per leverandør
@@ -69,13 +72,18 @@ Det vi kan gjøre:
 - Bruk dette til å **foreslå** hvilke leverandører brukeren bør laste opp en
   kontrakt for. Det er et hint, ikke en fasit.
 
-## Sikkerhet / ting å rydde i før produksjon
+## Sikkerhet
 
-- Fiken-token lagres i klartekst i MVP. Flytt til Supabase Vault eller krypter
-  med en nøkkel i env før ekte kunder.
-- `/api/fiken/suppliers` bruker foreløpig `FIKEN_API_TOKEN` fra env (én bruker).
-  Når auth er på plass: hent token fra `fiken_connection` for innlogget bruker.
-- Service role-nøkkelen brukes kun i `/api/cron/*`. Aldri importer
+- Fiken access-/refresh-token krypteres med AES-256-GCM (`lib/token-crypto.ts`,
+  nøkkel `TOKEN_ENC_KEY`) før de skrives til `fiken_connection`. Lesing er
+  tolerant: en gammel klartekst-rad uten `v1:`-prefiks returneres uendret og
+  "self-healer" ved neste token-refresh. `encryptToken()` kaster hvis nøkkelen
+  mangler eller ikke er 32 byte – sett den i miljøet før deploy.
+- Alle Fiken-kall går via `getFikenClientForCurrentUser()`, som henter token fra
+  `fiken_connection` for den innloggede brukeren. Ingen delt env-token.
+- Rå feil lekkes aldri til klient: `lib/api-errors.ts` logger detaljer
+  server-side og svarer med en generisk norsk melding + riktig statuskode.
+- Service role-nøkkelen brukes kun i `/api/cron/*` og admin-stier. Aldri importer
   `lib/supabase/admin.ts` i en vanlig bruker-route.
 - Cron-endepunktene er beskyttet av `CRON_SECRET` i Authorization-header
   (mangler secret → 401, aldri 500).
@@ -84,12 +92,10 @@ Det vi kan gjøre:
   `server-only`-frie og tar avhengigheter inn som parametre, så
   `scripts/reminders-test.ts` kan kjøre logikken direkte mot databasen.
 
-## Neste steg (rekkefølge)
+## Gjenstår (ikke blokkerende for pilot)
 
-1. Supabase Auth: e-post/passord eller magic link + `middleware.ts` for sesjon.
-2. Innstillinger-side: lagre Fiken-nøkkel → `fiken_connection`.
-3. "Synk"-knapp: skriv leverandører til `supplier`.
-4. Opplasting av PDF → Storage + `contract`-rad.
-5. LLM-uttrekk (`lib/extract.ts`) + `next_deadline`-beregning.
-6. Dashboard med nedtelling.
-7. Cron-logikk + e-postmal.
+- Aktiv backfill av gamle klartekst-token-rader (i dag: self-heal ved refresh).
+- `getAll` sitt tak på ~10 000 bilag per selskap logges kun som `console.warn`.
+- Foreldreløse storage-filer logges, slettes ikke automatisk.
+- Selskapsvelger for regnskapsførere med flere Fiken-bedrifter.
+- Ikke-kode: Resend domeneverifisering, personvernerklæring + databehandleravtaler.
