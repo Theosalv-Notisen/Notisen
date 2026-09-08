@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Logo } from "@/components/brand/logo";
+import { DashboardMockup } from "@/components/marketing/dashboard-mockup";
 import {
   btnPrimary,
   btnSecondary,
@@ -48,11 +49,11 @@ export default function Home() {
       </header>
 
       <main className="flex-1">
-        <section className="mx-auto max-w-4xl px-6 py-16 sm:py-24">
-          <h1 className="max-w-2xl text-3xl font-bold tracking-tight sm:text-4xl">
+        <section className="mx-auto max-w-4xl px-6 pt-16 pb-16 sm:pt-20">
+          <h1 className="max-w-3xl text-balance text-4xl font-bold leading-[1.1] tracking-tight sm:text-5xl lg:text-[3.5rem]">
             Hold oversikt over oppsigelsesfristene i bedriftens avtaler.
           </h1>
-          <p className="mt-4 max-w-2xl text-lg text-ink-secondary">
+          <p className="mt-5 max-w-2xl text-lg text-ink-secondary">
             Notisen kobler seg til regnskapet ditt i Fiken, finner de løpende
             leverandøravtalene, og minner deg på i god tid før du blir bundet for
             et nytt år.
@@ -61,6 +62,14 @@ export default function Home() {
             <Link href="/signup" className={btnPrimary}>
               Kom i gang
             </Link>
+          </div>
+          <p className="mt-4 max-w-xl text-sm text-ink-tertiary">
+            Notisen henter kun leverandørene og kjøpene dine fra Fiken og gjør
+            aldri endringer i regnskapet. Du kan koble fra når som helst.
+          </p>
+
+          <div className="mt-14 sm:mt-16">
+            <DashboardMockup />
           </div>
         </section>
 
@@ -89,11 +98,11 @@ export default function Home() {
         <section className="mx-auto max-w-4xl px-6 py-16">
           <h2 className="text-xl font-bold tracking-tight">Hvorfor Notisen?</h2>
           <p className="mt-4 max-w-2xl text-ink-secondary">
-            En oppsigelsesfrist er lett å glemme. Mange avtaler fornyes
-            automatisk for et helt år hvis de ikke sies opp innen en frist som
-            gjerne ligger to–tre måneder før fornyelsen. Da sitter bedriften
-            bundet til noe den egentlig ville avslutte. Notisen holder styr på
-            fristene, så du slipper.
+            En oppsigelsesfrist er lett å glemme. Si at du har en
+            programvareavtale til 5 000 kr i måneden med tre måneders
+            oppsigelsesfrist. Glipper fristen, sitter bedriften bundet et nytt år
+            – 60 000 kr, for en dato noen rett og slett glemte. Notisen holder
+            styr på fristene, så det ikke skjer.
           </p>
         </section>
 
