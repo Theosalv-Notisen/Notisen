@@ -105,7 +105,7 @@ export default async function SettingsPage({
         <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
           {slett_feil === "bekreftelse"
             ? "E-posten du skrev inn stemmer ikke."
-            : "Klarte ikke slette kontoen nå. Ingenting er slettet – prøv igjen om litt."}
+            : "Klarte ikke fullføre slettingen. Kontoen din er fortsatt aktiv – prøv igjen om litt."}
         </p>
       ) : null}
 
@@ -171,7 +171,14 @@ export default async function SettingsPage({
           helt tilbake.
         </p>
         <div className="mt-3">
-          <DeleteAccountForm email={user.email!} />
+          {user.email ? (
+            <DeleteAccountForm email={user.email} />
+          ) : (
+            <p className="text-xs opacity-60">
+              Sletting av konto krever en registrert e-postadresse. Ta kontakt så
+              hjelper vi deg.
+            </p>
+          )}
         </div>
       </section>
     </div>
