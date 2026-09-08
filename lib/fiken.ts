@@ -75,9 +75,17 @@ export class FikenClient {
   }
 
   private async authHeader(): Promise<string> {
-    const t = typeof this.token === "function" ? await this.token() : this.token;
+    const t = await this.resolveToken();
     if (!t) throw new Error("FikenClient: mangler access token");
     return `Bearer ${t}`;
+  }
+
+  /**
+   * Løser opp token-kilden til en konkret streng (kjører evt. refresh).
+   * Nyttig når kalleren vil cache Fiken-svar med et fast token som nøkkel.
+   */
+  async resolveToken(): Promise<string> {
+    return typeof this.token === "function" ? await this.token() : this.token;
   }
 
   private async get<T>(
@@ -118,24 +126,29 @@ export class FikenClient {
   ): Promise<T[]> {
     const pageSize = 100;
     const maxPages = 100; // sikkerhetsgrense mot uendelig løkke
-    let all: T[] = [];
-    let page = 0;
-    let headerPageCount: number | null = null;
 
-    // Termineringen stoler IKKE på `Fiken-Api-Page-Count`-headeren (den kan
-    // mangle): vi henter til en side kommer tilbake med færre enn `pageSize`
-    // rader. Headeren brukes kun som kryss-sjekk.
-    for (; page < maxPages; page++) {
-      const res = await this.get<T[]>(path, { ...params, page, pageSize });
-      if (page === 0) headerPageCount = res.pageCount;
-      all = all.concat(res.data);
-      if (res.data.length < pageSize) break;
+    const first = await this.get<T[]>(path, { ...params, page: 0, pageSize });
+    let all: T[] = [...first.data];
+    if (first.data.length < pageSize) return all;
+
+    // Kjenner vi sidetallet fra `Fiken-Api-Page-Count`? Hent resten parallelt
+    // i stedet for én og én – sparer én rundtur per ekstra side.
+    if (first.pageCount !== null && first.pageCount > 1) {
+      const lastPage = Math.min(first.pageCount, maxPages);
+      const rest = await Promise.all(
+        Array.from({ length: lastPage - 1 }, (_, i) =>
+          this.get<T[]>(path, { ...params, page: i + 1, pageSize }),
+        ),
+      );
+      for (const r of rest) all = all.concat(r.data);
+      return all;
     }
 
-    if (headerPageCount !== null && headerPageCount > page + 1) {
-      console.warn(
-        `Fiken ${path}: headeren sa ${headerPageCount} sider, hentet ${page + 1}`,
-      );
+    // Ingen header: fall tilbake til sekvensiell henting til en kort side.
+    for (let page = 1; page < maxPages; page++) {
+      const res = await this.get<T[]>(path, { ...params, page, pageSize });
+      all = all.concat(res.data);
+      if (res.data.length < pageSize) break;
     }
     return all;
   }

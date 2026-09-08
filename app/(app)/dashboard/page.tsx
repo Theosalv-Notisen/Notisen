@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { unstable_cache } from "next/cache";
+import { getCurrentUser, requireUser } from "@/lib/auth";
 import {
   FikenReauthRequiredError,
   getFikenClientForCurrentUser,
   NoFikenConnectionError,
 } from "@/lib/fiken-connection";
-import { FikenError } from "@/lib/fiken";
+import { FikenClient, FikenError } from "@/lib/fiken";
 import {
   analyzeRecurring,
   type Confidence,
@@ -45,20 +46,39 @@ type DashboardData =
   | { kind: "fiken_error" }
   | { kind: "error" };
 
+/**
+ * De tunge Fiken-kallene (selskaper + alle bilag per selskap), cachet i
+ * 3 minutter per bruker. Fiken-data endrer seg ikke fra minutt til minutt, så
+ * bare den første Oversikt-lasten i vinduet betaler for nettverket – resten er
+ * umiddelbare. `token` er med som argument slik at et rotert token gir cache-miss.
+ */
+function loadFikenData(userId: string) {
+  return unstable_cache(
+    async (token: string): Promise<CompanyRows[]> => {
+      const client = new FikenClient(token);
+      const companies = await client.companies();
+      return Promise.all(
+        companies.map(async (company) => ({
+          name: company.name,
+          slug: company.slug,
+          rows: analyzeRecurring(await client.purchases(company.slug)),
+        })),
+      );
+    },
+    ["dashboard-fiken", userId],
+    { revalidate: 180 },
+  );
+}
+
 async function loadDashboard(): Promise<DashboardData> {
   try {
     const fiken = await getFikenClientForCurrentUser();
-    const companies = await fiken.companies();
+    const user = await getCurrentUser();
+    const token = await fiken.resolveToken();
 
-    const result = await Promise.all(
-      companies.map(async (company) => ({
-        name: company.name,
-        slug: company.slug,
-        rows: analyzeRecurring(await fiken.purchases(company.slug)),
-      })),
-    );
+    const companies = await loadFikenData(user!.id)(token);
 
-    return { kind: "ok", companies: result };
+    return { kind: "ok", companies };
   } catch (err) {
     if (err instanceof NoFikenConnectionError) return { kind: "not_connected" };
     if (err instanceof FikenReauthRequiredError) return { kind: "reauth" };

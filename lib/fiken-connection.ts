@@ -9,6 +9,7 @@
 import "server-only";
 
 import { createClient } from "./supabase/server.ts";
+import { getCurrentUser } from "./auth.ts";
 import { env } from "./env.ts";
 import { FikenClient } from "./fiken.ts";
 import { refreshTokens } from "./fiken-oauth.ts";
@@ -61,9 +62,9 @@ function isInvalidGrant(err: unknown): boolean {
 export async function getFikenClientForCurrentUser(): Promise<FikenClient> {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getCurrentUser() er cache()-et, så dette deler auth-kallet med
+  // requireUser() i selve siden i stedet for å gjøre et nytt nettverkskall.
+  const user = await getCurrentUser();
   if (!user) throw new NotAuthenticatedError();
 
   const { data: conn, error } = await supabase

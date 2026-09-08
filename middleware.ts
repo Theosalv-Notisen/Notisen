@@ -10,14 +10,18 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
+  /*
+   * Kjør KUN på sider der sesjonen faktisk betyr noe: de beskyttede sidene
+   * (auth-sjekk + token-refresh) og innloggings-/registreringssidene (som
+   * redirecter en allerede innlogget bruker videre). Alt annet – forsiden,
+   * statiske filer, API-ruter (egne auth-sjekker), ikoner – slipper et
+   * `getUser()`-nettverkskall per request.
+   */
   matcher: [
-    /*
-     * Alle stier bortsett fra:
-     * - api (route handlers gjør egne auth-sjekker; slipper et getUser()-
-     *   nettverkskall per API-request)
-     * - _next/static, _next/image (byggeartefakter)
-     * - favicon.ico og vanlige bildefiler
-     */
-    "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/dashboard/:path*",
+    "/settings/:path*",
+    "/kontrakter/:path*",
+    "/login",
+    "/signup",
   ],
 };
