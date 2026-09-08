@@ -13,7 +13,9 @@ create extension if not exists "pgcrypto";
 create table if not exists public.fiken_connection (
   id                       uuid primary key default gen_random_uuid(),
   user_id                  uuid not null references auth.users (id) on delete cascade,
-  -- OAuth2-tokens. Bør krypteres / legges i Supabase Vault i produksjon.
+  -- OAuth2-tokens. App-kryptert med AES-256-GCM (lib/token-crypto.ts) før
+  -- lagring, format "v1:<iv>:<tag>:<ciphertext>". Nøkkel: TOKEN_ENC_KEY.
+  -- `text` rommer den krypterte strengen (~110 tegn) – ingen kolonne-endring.
   access_token             text not null,
   refresh_token            text not null,
   access_token_expires_at  timestamptz not null,

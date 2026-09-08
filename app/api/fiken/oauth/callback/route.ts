@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { exchangeCodeForTokens } from "@/lib/fiken-oauth";
 import { env } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
+import { encryptToken } from "@/lib/token-crypto";
 
 /**
  * GET /api/fiken/oauth/callback
@@ -46,8 +47,8 @@ export async function GET(request: Request) {
     const { error } = await supabase.from("fiken_connection").upsert(
       {
         user_id: user.id,
-        access_token: tokens.accessToken,
-        refresh_token: tokens.refreshToken,
+        access_token: encryptToken(tokens.accessToken),
+        refresh_token: encryptToken(tokens.refreshToken),
         access_token_expires_at: new Date(tokens.expiresAt).toISOString(),
         updated_at: new Date().toISOString(),
       },

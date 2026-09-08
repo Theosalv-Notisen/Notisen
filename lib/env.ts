@@ -43,4 +43,20 @@ export const env = {
   cronSecret: () => required("CRON_SECRET"),
   /** Som cronSecret(), men kaster ikke – brukes der vi vil svare 401 selv om variabelen mangler. */
   cronSecretOptional: () => optional("CRON_SECRET"),
+
+  /**
+   * Nøkkel for kryptering av Fiken OAuth-tokens før de lagres i Supabase.
+   * Nøyaktig 32 bytes, base64-kodet i miljøet. Generer med:
+   *   openssl rand -base64 32
+   */
+  tokenEncKey: (): Buffer => {
+    const key = Buffer.from(required("TOKEN_ENC_KEY"), "base64");
+    if (key.length !== 32) {
+      throw new Error(
+        `TOKEN_ENC_KEY må være nøyaktig 32 bytes base64-kodet (fikk ${key.length}). ` +
+          "Generer en ny med: openssl rand -base64 32",
+      );
+    }
+    return key;
+  },
 };

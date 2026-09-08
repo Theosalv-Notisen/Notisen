@@ -12,6 +12,7 @@ import { createClient } from "./supabase/server.ts";
 import { env } from "./env.ts";
 import { FikenClient } from "./fiken.ts";
 import { refreshTokens } from "./fiken-oauth.ts";
+import { decryptToken, encryptToken } from "./token-crypto.ts";
 
 export class NoFikenConnectionError extends Error {
   constructor() {
@@ -74,10 +75,10 @@ export async function getFikenClientForCurrentUser(): Promise<FikenClient> {
   if (error) throw error;
   if (!conn) throw new NoFikenConnectionError();
 
-  let accessToken = conn.access_token as string;
+  let accessToken = decryptToken(conn.access_token as string);
   let expiresAt = new Date(conn.access_token_expires_at as string).getTime();
 
-  let refreshToken = conn.refresh_token as string;
+  let refreshToken = decryptToken(conn.refresh_token as string);
 
   // Single-flight i denne prosessen: dashboardet henter flere selskaper
   // parallelt (Promise.all). Uten dette kan flere kall trigge hver sitt
@@ -109,9 +110,13 @@ export async function getFikenClientForCurrentUser(): Promise<FikenClient> {
 
       if (reloadError) throw reloadError;
 
-      if (freshRow && (freshRow.refresh_token as string) !== refreshToken) {
-        refreshToken = freshRow.refresh_token as string;
-        accessToken = freshRow.access_token as string;
+      const freshRefreshToken = freshRow
+        ? decryptToken(freshRow.refresh_token as string)
+        : null;
+
+      if (freshRow && freshRefreshToken !== refreshToken) {
+        refreshToken = freshRefreshToken as string;
+        accessToken = decryptToken(freshRow.access_token as string);
         expiresAt = new Date(
           freshRow.access_token_expires_at as string,
         ).getTime();
@@ -128,8 +133,8 @@ export async function getFikenClientForCurrentUser(): Promise<FikenClient> {
     const { error: updateError } = await supabase
       .from("fiken_connection")
       .update({
-        access_token: fresh.accessToken,
-        refresh_token: fresh.refreshToken,
+        access_token: encryptToken(fresh.accessToken),
+        refresh_token: encryptToken(fresh.refreshToken),
         access_token_expires_at: new Date(fresh.expiresAt).toISOString(),
         updated_at: new Date().toISOString(),
       })

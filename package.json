@@ -14,7 +14,10 @@
     "reminders:test": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/reminders-test.ts",
     "maintenance:test": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/maintenance-test.ts",
     "delete-contract:test": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/delete-contract-test.ts",
-    "deadline:test": "node scripts/deadline-test.ts"
+    "deadline:test": "node scripts/deadline-test.ts",
+    "token-crypto:test": "node scripts/token-crypto-test.ts",
+    "fiken-token-encryption:test": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/fiken-token-encryption-test.ts",
+    "encrypt-tokens:migrate": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/encrypt-fiken-tokens.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
