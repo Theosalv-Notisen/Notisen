@@ -82,12 +82,17 @@ export async function deleteAccountData(
     result.storageFilesDeleted += (data ?? []).length;
   }
 
-  // ── 3. Avbryt hvis noe storage-arbeid feilet – IKKE slett brukeren ────
-  if (result.storageErrors.length > 0) {
+  // ── 3. Avbryt hvis noe storage-arbeid feilet eller ikke alt ble slettet
+  //      – IKKE slett brukeren, så hen kan logge inn og prøve igjen ────────
+  if (
+    result.storageErrors.length > 0 ||
+    result.storageFilesDeleted < result.storageFilesFound
+  ) {
     throw new Error(
       `Klarte ikke rydde alle storage-filer for bruker ${userId} ` +
         `(${result.storageFilesDeleted}/${result.storageFilesFound} slettet). ` +
-        `Feil: ${result.storageErrors.join(" | ")}. Brukeren ble IKKE slettet.`,
+        `Feil: ${result.storageErrors.join(" | ") || "(ingen feilmelding)"}. ` +
+        `Brukeren ble IKKE slettet.`,
     );
   }
 
