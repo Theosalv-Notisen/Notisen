@@ -8,7 +8,14 @@
 export function isSameOrigin(request: Request): boolean {
   const origin = request.headers.get("origin");
   const host = request.headers.get("host");
-  const originOk = origin !== null && new URL(origin).host === host;
+  let originOk = false;
+  if (origin !== null) {
+    try {
+      originOk = new URL(origin).host === host;
+    } catch {
+      originOk = false; // misformet Origin-header
+    }
+  }
   const sameSite = request.headers.get("sec-fetch-site") === "same-origin";
   return originOk || sameSite;
 }

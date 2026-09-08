@@ -9,14 +9,25 @@ import { createClient } from "@/lib/supabase/server";
  */
 
 /**
- * Beskytt mot "open redirect": bare interne stier godtas.
- * Alt annet faller tilbake til /dashboard.
+ * Beskytt mot "open redirect": bare en enkel intern sti godtas.
+ * Alt annet (protokoll-relativt `//`, `/\`, kontrolltegn som nettleseren
+ * stripper til noe farlig, absolutte URL-er) faller tilbake til /dashboard.
  */
 function safeNext(value: FormDataEntryValue | null): string {
   if (typeof value !== "string") return "/dashboard";
-  if (!value.startsWith("/")) return "/dashboard";
-  if (value.startsWith("//") || value.startsWith("/\\")) return "/dashboard";
-  return value;
+  // Må starte med én "/" fulgt av noe som ikke er "/" eller "\".
+  if (!/^\/[^/\\]/.test(value)) return "/dashboard";
+  for (let i = 0; i < value.length; i++) {
+    const c = value.charCodeAt(i);
+    if (c < 0x20 || c === 0x7f) return "/dashboard"; // kontrolltegn
+  }
+  try {
+    const url = new URL(value, "http://localhost");
+    if (url.origin !== "http://localhost") return "/dashboard";
+    return url.pathname + url.search + url.hash;
+  } catch {
+    return "/dashboard";
+  }
 }
 
 function readCredentials(formData: FormData) {

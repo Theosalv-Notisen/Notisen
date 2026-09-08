@@ -51,7 +51,7 @@ export type FikenPurchase = {
   deleted?: boolean;
   settled?: boolean;
   currency: string;
-  lines: FikenOrderLine[];
+  lines?: FikenOrderLine[];
   supplier?: FikenContact;
 };
 
@@ -161,7 +161,9 @@ export class FikenClient {
 
 /** Sum av et bilag i kroner (netto + mva over alle linjer). */
 export function purchaseTotalNok(purchase: FikenPurchase): number {
-  const ore = purchase.lines.reduce(
+  // `lines` er påkrevd i Fiken-typen, men API-et garanterer det ikke for alle
+  // bilagstyper/utkast – uten `?? []` velter et rart kjøp hele dashboardet.
+  const ore = (purchase.lines ?? []).reduce(
     (sum, l) => sum + (l.netPrice ?? 0) + (l.vat ?? 0),
     0,
   );

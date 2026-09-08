@@ -148,11 +148,27 @@ export async function runExtraction(
       nextDeadline: deadline.date,
     };
   } catch (extractErr) {
-    const message =
-      extractErr instanceof Error
-        ? extractErr.message
-        : "Ukjent feil under tolkningen.";
     console.error("Uttrekk feilet for kontrakt", id, extractErr);
+    const raw =
+      extractErr instanceof Error ? extractErr.message : String(extractErr);
+
+    // Vis en forståelig norsk melding – aldri rå API-respons (den kan inneholde
+    // request-id-er, feltstier og engelsk feiltekst fra Anthropic).
+    let message =
+      "Klarte ikke tolke PDF-en. Prøv igjen – hjelper det ikke, kan PDF-en " +
+      "være skadet eller i et format vi ikke klarer å lese.";
+    if (/overloaded|rate.?limit|\b429\b|\b529\b/i.test(raw)) {
+      message =
+        "Tolkningstjenesten er opptatt akkurat nå. Vent noen minutter og prøv igjen.";
+    } else if (/not a? valid|invalid_request|base64|corrupt/i.test(raw)) {
+      message =
+        "PDF-en ser ut til å være skadet eller ufullstendig. Last opp filen på nytt.";
+    } else if (/laste ned PDF/i.test(raw)) {
+      message = "Klarte ikke hente PDF-en fra lageret. Prøv igjen om litt.";
+    } else if (/kalte ikke verktøyet|gyldig input-objekt/i.test(raw)) {
+      message = "Tolkningen ga et ufullstendig svar. Prøv igjen.";
+    }
+
     await supabase
       .from("contract")
       .update({

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { isSameOrigin } from "@/lib/csrf";
 
 /**
  * POST /api/fiken/disconnect
@@ -7,15 +8,9 @@ import { createClient } from "@/lib/supabase/server";
  * Fjerner ikke Notisen sin tilgang inne i Fiken – det må brukeren gjøre selv.
  */
 export async function POST(request: Request) {
-  // Enkel CSRF-beskyttelse: skjemaet skal postes fra vår egen origin.
-  // Tillat kun hvis Origin finnes og matcher, eller Sec-Fetch-Site sier same-origin.
-  // Mangler begge, avviser vi (så sjekken ikke kan hoppes over).
-  const origin = request.headers.get("origin");
-  const host = request.headers.get("host");
-  const originOk = origin !== null && new URL(origin).host === host;
-  const sameSite = request.headers.get("sec-fetch-site") === "same-origin";
-  if (!originOk && !sameSite) {
-    return new NextResponse("Ugyldig opprinnelse.", { status: 403 });
+  // CSRF: skjemaet skal postes fra vår egen origin (delt sjekk med upload/extract).
+  if (!isSameOrigin(request)) {
+    return NextResponse.json({ error: "Ugyldig opprinnelse." }, { status: 403 });
   }
 
   const supabase = await createClient();

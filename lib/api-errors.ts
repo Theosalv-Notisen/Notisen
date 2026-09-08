@@ -34,8 +34,10 @@ export function errorResponse(err: unknown) {
     );
   }
   if (err instanceof FikenError) {
+    // Detaljen (rå Fiken-respons + intern URL-sti) logges, ikke vises til bruker.
+    console.error("Fiken-API-feil:", err.status, err.message, err.body);
     return NextResponse.json(
-      { error: err.message, status: err.status, body: err.body },
+      { error: "Klarte ikke hente data fra Fiken akkurat nå. Prøv igjen om litt." },
       { status: err.status === 401 ? 401 : 502 },
     );
   }
