@@ -38,6 +38,11 @@ export function errorResponse(err: unknown) {
       { status: err.status === 401 ? 401 : 502 },
     );
   }
-  const message = err instanceof Error ? err.message : "Ukjent feil";
-  return NextResponse.json({ error: message }, { status: 500 });
+  // Uventet feil: logg detaljen server-side, gi bruker en generisk melding
+  // (rå `err.message` kan avsløre f.eks. manglende miljøvariabler).
+  console.error("Uventet feil i Fiken-route:", err);
+  return NextResponse.json(
+    { error: "Noe gikk galt. Prøv igjen om litt." },
+    { status: 500 },
+  );
 }
