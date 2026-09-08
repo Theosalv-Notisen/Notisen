@@ -100,27 +100,32 @@ export async function getFikenClientForCurrentUser(): Promise<FikenClient> {
       // Cross-request-race: en annen samtidig HTTP-request for samme bruker kan
       // ha fornyet tokenet allerede, slik at refresh-tokenet vårt nå er rotert
       // bort. `refreshInFlight` er lokal per kall og hjelper ikke på tvers av
-      // requests. Les raden på nytt: er refresh_token endret, bruk den friske
-      // raden. Bare hvis raden er uendret er tilkoblingen faktisk død.
-      const { data: freshRow, error: reloadError } = await supabase
-        .from("fiken_connection")
-        .select("access_token, refresh_token, access_token_expires_at")
-        .eq("id", conn!.id)
-        .maybeSingle();
+      // requests. Les raden på nytt (med noen få forsøk – vinneren kan ennå
+      // ikke ha rukket å committe): er refresh_token endret, adopter den. Bare
+      // hvis raden er uendret etter siste forsøk er tilkoblingen faktisk død.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { data: freshRow, error: reloadError } = await supabase
+          .from("fiken_connection")
+          .select("access_token, refresh_token, access_token_expires_at")
+          .eq("id", conn!.id)
+          .maybeSingle();
 
-      if (reloadError) throw reloadError;
+        if (reloadError) throw reloadError;
 
-      const freshRefreshToken = freshRow
-        ? decryptToken(freshRow.refresh_token as string)
-        : null;
+        const freshRefreshToken = freshRow
+          ? decryptToken(freshRow.refresh_token as string)
+          : null;
 
-      if (freshRow && freshRefreshToken !== refreshToken) {
-        refreshToken = freshRefreshToken as string;
-        accessToken = decryptToken(freshRow.access_token as string);
-        expiresAt = new Date(
-          freshRow.access_token_expires_at as string,
-        ).getTime();
-        return accessToken;
+        if (freshRow && freshRefreshToken !== refreshToken) {
+          refreshToken = freshRefreshToken as string;
+          accessToken = decryptToken(freshRow.access_token as string);
+          expiresAt = new Date(
+            freshRow.access_token_expires_at as string,
+          ).getTime();
+          return accessToken;
+        }
+
+        if (attempt < 2) await new Promise((r) => setTimeout(r, 400));
       }
 
       throw new FikenReauthRequiredError();

@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 const BADGE_TEXT: Record<Confidence, string> = {
   high: "Sannsynlig løpende avtale",
   medium: "Mulig løpende",
-  low: "Engangs",
+  low: "Muligens løpende (usikker)",
   none: "Engangs",
 };
 

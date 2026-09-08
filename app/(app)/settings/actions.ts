@@ -35,8 +35,14 @@ export async function deleteAccount(formData: FormData) {
   try {
     await deleteAccountData(admin, user.id);
   } catch (err) {
-    console.error("Sletting av konto feilet for bruker", user.id, err);
-    redirect("/settings?slett_feil=1");
+    const msg = err instanceof Error ? err.message.toLowerCase() : "";
+    // Dobbeltklikk / retry: første kall slettet allerede brukeren, andre kall
+    // får «User not found». Da ER kontoen borte – behandle som suksess.
+    const alreadyGone = /not found|user_not_found|does not exist/.test(msg);
+    if (!alreadyGone) {
+      console.error("Sletting av konto feilet for bruker", user.id, err);
+      redirect("/settings?slett_feil=1");
+    }
   }
 
   await supabase.auth.signOut();

@@ -39,7 +39,7 @@ function emptyToNull(value: FormDataEntryValue | null): string | null {
 
 export async function confirmContract(formData: FormData) {
   const id = emptyToNull(formData.get("id"));
-  if (!id) throw new Error("Mangler kontrakt-id.");
+  if (!id) redirect("/kontrakter");
 
   const supabase = await createClient();
   const {
@@ -113,6 +113,9 @@ export async function confirmContract(formData: FormData) {
     })
     .eq("id", id)
     .eq("user_id", user.id)
+    // Statusvern: en tilpasset POST skal ikke kunne tvinge en
+    // draft/processing/failed-kontrakt rett til 'confirmed'.
+    .in("status", ["extracted", "confirmed"])
     .select("id")
     .maybeSingle();
 

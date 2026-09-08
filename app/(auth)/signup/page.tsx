@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { signUp } from "../actions";
+import { getCurrentUser } from "@/lib/auth";
 
 /**
  * Registreringsside. Server-komponent, poster til signUp-action.
@@ -7,7 +9,9 @@ import { signUp } from "../actions";
  */
 const FEIL_TEKST: Record<string, string> = {
   "svakt-passord": "Passordet er for svakt. Bruk minst 6 tegn.",
+  "for-langt-passord": "Passordet er for langt. Maks 72 tegn.",
   "ugyldig-epost": "Ugyldig e-postadresse.",
+  tomt: "Fyll ut både e-post og passord.",
 };
 
 export default async function SignupPage({
@@ -15,6 +19,8 @@ export default async function SignupPage({
 }: {
   searchParams: Promise<{ next?: string; feil?: string }>;
 }) {
+  if (await getCurrentUser()) redirect("/dashboard");
+
   const { next, feil } = await searchParams;
   const nextPath = next ?? "/dashboard";
   const error = feil
@@ -29,9 +35,12 @@ export default async function SignupPage({
       </p>
 
       {error ? (
-        <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
-          {error}
-        </p>
+        <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+          <p>{error}</p>
+          <p className="mt-1 opacity-80">
+            Har du allerede en konto? Prøv å logge inn eller nullstille passordet.
+          </p>
+        </div>
       ) : null}
 
       <form action={signUp} className="mt-6 space-y-4">

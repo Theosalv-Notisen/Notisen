@@ -1,11 +1,14 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { signIn } from "../actions";
+import { getCurrentUser } from "@/lib/auth";
 
 /**
  * Innloggingsside. Server-komponent, poster til signIn-action.
  */
 const FEIL_TEKST: Record<string, string> = {
   ugyldig: "Feil e-post eller passord.",
+  tomt: "Fyll ut både e-post og passord.",
 };
 
 export default async function LoginPage({
@@ -14,6 +17,8 @@ export default async function LoginPage({
   searchParams: Promise<{ next?: string; feil?: string; slettet?: string }>;
 }) {
   const { next, feil, slettet } = await searchParams;
+  // Allerede innlogget → rett til dashbordet (men behold ?slettet=1-kvitteringen).
+  if (!slettet && (await getCurrentUser())) redirect("/dashboard");
   const nextPath = next ?? "/dashboard";
   const error = feil ? (FEIL_TEKST[feil] ?? "Innlogging feilet.") : null;
 

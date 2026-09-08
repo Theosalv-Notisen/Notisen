@@ -99,8 +99,10 @@ function buildReason(r: SupplierRecurrence): string {
     return "Bare én registrering i Fiken – ingen gjentakelse å se.";
   }
   const parts: string[] = [`${r.occurrences} kjøp`];
-  if (r.medianGapDays != null) {
+  if (r.medianGapDays != null && r.medianGapDays > 0) {
     parts.push(`ca. ${r.medianGapDays} dager mellom hver`);
+  } else if (r.medianGapDays === 0) {
+    parts.push("flere ført på samme dato");
   }
   if (r.cadence) parts.push(`passer et ${r.cadence.label} mønster`);
   else parts.push("uten et tydelig fast intervall");
@@ -121,6 +123,10 @@ export function analyzeRecurring(
   for (const p of purchases) {
     const supplier = p.supplier;
     if (!supplier?.contactId) continue;
+    const totalNok = purchaseTotalNok(p);
+    // Hopp over kreditnotaer / negative beløp – en løpende utgift er positiv,
+    // og en gjentakende kreditnota er ikke en avtale å varsle om.
+    if (totalNok <= 0) continue;
     const g = groups.get(supplier.contactId) ?? {
       name: supplier.name ?? "Ukjent leverandør",
       points: [],
@@ -128,7 +134,7 @@ export function analyzeRecurring(
     g.points.push({
       purchaseId: p.purchaseId,
       date: p.date,
-      totalNok: purchaseTotalNok(p),
+      totalNok,
     });
     groups.set(supplier.contactId, g);
   }

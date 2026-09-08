@@ -61,7 +61,8 @@ Regler:
 - Alle datoer på formen ÅÅÅÅ-MM-DD.
 - term_months og notice_period_days skal være hele tall.
 - For hvert felt du gir en verdi: legg et ordrett sitat fra dokumentet i "source_quotes" som belegg (feltnavn + sitat).
-- Sett "confidence" etter hvor sikker og lesbar kilden er: dårlig skann, håndskrift eller tvetydig ordlyd => "low".`;
+- Sett "confidence" etter hvor sikker og lesbar kilden er: dårlig skann, håndskrift eller tvetydig ordlyd => "low".
+- Er dokumentet IKKE en avtale/kontrakt, eller finner du ingen avtalevilkår i det: sett alle feltene til null, "confidence" til "low", og forklar i "notes".`;
 
 const TOOL: Anthropic.Tool = {
   name: "record_contract_terms",

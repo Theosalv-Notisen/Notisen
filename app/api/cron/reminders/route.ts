@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { env } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isAuthorizedCron } from "@/lib/cron-auth";
 import { runReminders } from "@/lib/reminders";
 import { sendReminderEmail } from "@/lib/email";
 
@@ -19,10 +19,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function GET(request: Request) {
-  // Hent secret defensivt: mangler den, svarer vi 401 (ikke 500).
-  const secret = env.cronSecretOptional();
-  const auth = request.headers.get("authorization");
-  if (!secret || auth !== `Bearer ${secret}`) {
+  if (!isAuthorizedCron(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

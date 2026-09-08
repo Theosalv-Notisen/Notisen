@@ -83,7 +83,7 @@ export class FikenClient {
   private async get<T>(
     path: string,
     params: Record<string, string | number | boolean | undefined> = {},
-  ): Promise<{ data: T; pageCount: number }> {
+  ): Promise<{ data: T; pageCount: number | null }> {
     const url = new URL(BASE_URL + path);
     for (const [k, v] of Object.entries(params)) {
       if (v !== undefined) url.searchParams.set(k, String(v));
@@ -105,9 +105,10 @@ export class FikenClient {
       );
     }
 
+    const pageCountHeader = res.headers.get("Fiken-Api-Page-Count");
     return {
       data: (await res.json()) as T,
-      pageCount: Number(res.headers.get("Fiken-Api-Page-Count") ?? "1"),
+      pageCount: pageCountHeader === null ? null : Number(pageCountHeader),
     };
   }
 
@@ -116,11 +117,25 @@ export class FikenClient {
     params: Record<string, string | number | boolean | undefined> = {},
   ): Promise<T[]> {
     const pageSize = 100;
-    const first = await this.get<T[]>(path, { ...params, page: 0, pageSize });
-    let all = first.data;
-    for (let page = 1; page < first.pageCount; page++) {
-      const next = await this.get<T[]>(path, { ...params, page, pageSize });
-      all = all.concat(next.data);
+    const maxPages = 100; // sikkerhetsgrense mot uendelig løkke
+    let all: T[] = [];
+    let page = 0;
+    let headerPageCount: number | null = null;
+
+    // Termineringen stoler IKKE på `Fiken-Api-Page-Count`-headeren (den kan
+    // mangle): vi henter til en side kommer tilbake med færre enn `pageSize`
+    // rader. Headeren brukes kun som kryss-sjekk.
+    for (; page < maxPages; page++) {
+      const res = await this.get<T[]>(path, { ...params, page, pageSize });
+      if (page === 0) headerPageCount = res.pageCount;
+      all = all.concat(res.data);
+      if (res.data.length < pageSize) break;
+    }
+
+    if (headerPageCount !== null && headerPageCount > page + 1) {
+      console.warn(
+        `Fiken ${path}: headeren sa ${headerPageCount} sider, hentet ${page + 1}`,
+      );
     }
     return all;
   }

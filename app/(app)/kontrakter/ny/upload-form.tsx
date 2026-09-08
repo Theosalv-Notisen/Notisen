@@ -18,6 +18,7 @@ export function UploadForm({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -38,6 +39,11 @@ export function UploadForm({
         contractId?: string;
         error?: string;
       };
+      if (res.status === 401) {
+        setSessionExpired(true);
+        setBusy(false);
+        return;
+      }
       if (!res.ok || !json.contractId) {
         setError(json.error ?? "Opplasting feilet. Prøv igjen.");
         setBusy(false);
@@ -52,6 +58,15 @@ export function UploadForm({
 
   return (
     <form onSubmit={onSubmit} className="mt-6 space-y-4">
+      {sessionExpired ? (
+        <p className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+          Økten din er utløpt.{" "}
+          <a href="/login?next=/kontrakter" className="underline">
+            Logg inn på nytt
+          </a>
+          .
+        </p>
+      ) : null}
       {error ? (
         <p className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
           {error}

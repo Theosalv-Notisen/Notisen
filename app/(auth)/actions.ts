@@ -45,6 +45,10 @@ function readCredentials(formData: FormData) {
  */
 function signupFeilkode(message: string): string {
   const m = message.toLowerCase();
+  // bcrypt-grensen er 72 bytes – Supabase-feilen nevner "72" eller "long".
+  if (m.includes("72") || m.includes("too long") || m.includes("for langt")) {
+    return "for-langt-passord";
+  }
   if (m.includes("password")) return "svakt-passord";
   if (m.includes("valid") && m.includes("email")) return "ugyldig-epost";
   return "ukjent";
@@ -52,6 +56,13 @@ function signupFeilkode(message: string): string {
 
 export async function signUp(formData: FormData) {
   const { email, password, next } = readCredentials(formData);
+
+  if (!email || !password) {
+    redirect(`/signup?feil=tomt&next=${encodeURIComponent(next)}`);
+  }
+  if (password.length > 72) {
+    redirect(`/signup?feil=for-langt-passord&next=${encodeURIComponent(next)}`);
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signUp({ email, password });
@@ -67,6 +78,10 @@ export async function signUp(formData: FormData) {
 
 export async function signIn(formData: FormData) {
   const { email, password, next } = readCredentials(formData);
+
+  if (!email || !password) {
+    redirect(`/login?feil=tomt&next=${encodeURIComponent(next)}`);
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });

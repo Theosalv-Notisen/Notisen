@@ -76,9 +76,21 @@ export async function POST(request: Request) {
         { status: 413 },
       );
     }
-    if (bytes.subarray(0, 5).toString("latin1") !== "%PDF-") {
+    // Lett strukturell PDF-sjekk (uten PDF-bibliotek): header + trailer + minstestr.
+    // Stopper omdøpte tekstfiler og avkuttede filer før de dør i uttrekket.
+    const looksLikePdf =
+      bytes.length >= 400 &&
+      bytes.subarray(0, 5).toString("latin1") === "%PDF-" &&
+      bytes
+        .subarray(Math.max(0, bytes.length - 2048))
+        .toString("latin1")
+        .includes("%%EOF");
+    if (!looksLikePdf) {
       return NextResponse.json(
-        { error: "Filen ser ikke ut som en gyldig PDF." },
+        {
+          error:
+            "Filen ser ikke ut som en gyldig PDF. Prøv å eksportere den på nytt.",
+        },
         { status: 415 },
       );
     }
