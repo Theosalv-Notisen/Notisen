@@ -11,6 +11,10 @@ import {
 import { confirmContract } from "../actions";
 import { ExtractControls } from "./extract-controls";
 import { DeleteButton } from "./delete-button";
+import { Alert } from "@/components/ui/alert";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { btnPrimary } from "@/components/ui/button-styles";
+import { inputClass, labelClass } from "@/components/ui/field";
 
 export const dynamic = "force-dynamic";
 
@@ -56,9 +60,9 @@ const CONFIDENCE_LABEL: Record<string, string> = {
 function Belegg({ quotes }: { quotes: string[] }) {
   if (quotes.length === 0) return null;
   return (
-    <ul className="mt-1 space-y-1 text-xs opacity-60">
+    <ul className="mt-1 space-y-1 text-xs text-ink-tertiary">
       {quotes.map((q, i) => (
-        <li key={i} className="border-l-2 border-black/20 pl-2 dark:border-white/20">
+        <li key={i} className="border-l-2 border-border pl-2">
           «{q}»
         </li>
       ))}
@@ -93,9 +97,9 @@ export default async function KontraktDetaljPage({
 
   if (error) {
     return (
-      <p className="rounded-xl border border-red-500/30 bg-red-500/10 p-6 text-sm text-red-700 dark:text-red-300">
+      <Alert variant="critical">
         Klarte ikke hente kontrakten nå. Prøv igjen om litt.
-      </p>
+      </Alert>
     );
   }
   if (!data) notFound();
@@ -105,20 +109,23 @@ export default async function KontraktDetaljPage({
 
   return (
     <div>
-      <Link href="/kontrakter" className="text-sm opacity-70 hover:opacity-100">
+      <Link
+        href="/kontrakter"
+        className="text-sm text-ink-secondary hover:text-ink"
+      >
         ← Alle kontrakter
       </Link>
 
       <div className="mt-2 flex items-start justify-between gap-4">
-        <h1 className="text-2xl font-semibold">
+        <h1 className="text-2xl font-bold tracking-tight">
           {c.supplier?.name ?? "Ukjent leverandør"}
         </h1>
-        <span className="shrink-0 rounded-full border border-black/15 px-2 py-0.5 text-xs dark:border-white/20">
+        <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-xs text-ink-secondary">
           {STATUS_LABEL[c.status] ?? c.status}
         </span>
       </div>
 
-      <p className="mt-1 text-sm opacity-70">
+      <p className="mt-1 text-sm text-ink-secondary">
         {c.supplier?.organization_number
           ? `Org.nr ${c.supplier.organization_number} · `
           : ""}
@@ -126,64 +133,64 @@ export default async function KontraktDetaljPage({
           href={`/api/contracts/${c.id}/file`}
           target="_blank"
           rel="noopener noreferrer"
-          className="underline"
+          className="text-accent underline"
         >
           Åpne PDF{c.original_filename ? ` (${c.original_filename})` : ""}
         </a>
       </p>
 
       {bekreftet && uten_frist ? (
-        <p className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+        <Alert variant="warning" className="mt-4">
           Kontrakten er lagret, men vi fant ingen dato å telle ned til. Da får du
           ikke påminnelser for denne før du legger inn en frist (startdato +
           varighet, bindingstid eller fornyelsesdato) manuelt.
-        </p>
+        </Alert>
       ) : bekreftet ? (
-        <p className="mt-4 rounded-lg border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-700 dark:text-green-300">
+        <Alert variant="good" className="mt-4">
           Kontrakten er bekreftet. Nå kan den utløse påminnelser.
-        </p>
+        </Alert>
       ) : null}
 
       {justert ? (
-        <p className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+        <Alert variant="warning" className="mt-4">
           Noen felt ble justert ved lagring: {justert}. Sjekk verdiene og lagre
           på nytt om noe ble feil.
-        </p>
+        </Alert>
       ) : null}
 
       {feil === "slett" ? (
-        <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+        <Alert variant="critical" className="mt-4">
           Klarte ikke slette kontrakten. Den finnes kanskje ikke lenger, eller du
           har ikke tilgang til den.
-        </p>
+        </Alert>
       ) : null}
 
       {feil === "bekreft" ? (
-        <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+        <Alert variant="critical" className="mt-4">
           Klarte ikke bekrefte kontrakten. Den finnes kanskje ikke lenger, eller
           du har ikke tilgang til den.
-        </p>
+        </Alert>
       ) : null}
 
       {c.deadline_rolled_at ? (
-        <p className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+        <Alert variant="warning" className="mt-4">
           {c.next_deadline
             ? `Forrige periodes oppsigelsesfrist er passert. Ny frist er beregnet til ${formatDeadline(
                 c.next_deadline,
               )}. Sjekk at den stemmer – lagre på nytt for å bekrefte.`
             : "Forrige frist er passert, og vi klarte ikke regne ut en ny (avtalen fornyes ikke automatisk, eller feltene er mangelfulle). Gå gjennom feltene og lagre, eller slett kontrakten hvis den er avsluttet."}
-        </p>
+        </Alert>
       ) : null}
 
       {c.needs_review && c.status !== "confirmed" ? (
-        <p className="mt-4 rounded-lg border border-black/15 bg-black/5 p-3 text-sm dark:border-white/20 dark:bg-white/10">
+        <Alert variant="neutral" className="mt-4">
           Denne trenger en gjennomgang. Sjekk feltene mot PDF-en og bekreft.
-        </p>
+        </Alert>
       ) : null}
 
       {/* ── Tilstandsavhengige kontroller ─────────────────────────── */}
       {c.status === "draft" ? (
-        <p className="mt-6 text-sm opacity-70">
+        <p className="mt-6 text-sm text-ink-secondary">
           PDF-en er ikke ferdig lastet opp. Last opp kontrakten på nytt.
         </p>
       ) : null}
@@ -201,9 +208,9 @@ export default async function KontraktDetaljPage({
 
       {c.status === "failed" ? (
         <div className="mt-4">
-          <p className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+          <Alert variant="critical">
             Tolkningen feilet: {c.extraction_error ?? "ukjent feil"}
-          </p>
+          </Alert>
           <ExtractControls contractId={c.id} mode="retry" />
         </div>
       ) : null}
@@ -213,11 +220,14 @@ export default async function KontraktDetaljPage({
         <>
           <dl className="mt-6 grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
             <div className="sm:col-span-2">
-              <dt className="opacity-60">Beregnet oppsigelsesfrist</dt>
-              <dd>{formatDeadline(c.next_deadline)}</dd>
+              <dt className="text-ink-tertiary">Beregnet oppsigelsesfrist</dt>
+              <dd className="flex flex-wrap items-center gap-2 tabular-nums">
+                {formatDeadline(c.next_deadline)}
+                <StatusBadge deadline={c.next_deadline} />
+              </dd>
             </div>
             <div>
-              <dt className="opacity-60">Konfidens fra tolkningen</dt>
+              <dt className="text-ink-tertiary">Konfidens fra tolkningen</dt>
               <dd>
                 {c.extraction_confidence
                   ? (CONFIDENCE_LABEL[c.extraction_confidence] ??
@@ -226,12 +236,12 @@ export default async function KontraktDetaljPage({
               </dd>
             </div>
             <div>
-              <dt className="opacity-60">Modell</dt>
+              <dt className="text-ink-tertiary">Modell</dt>
               <dd className="truncate">{c.llm_model ?? "–"}</dd>
             </div>
             {c.extraction_notes ? (
               <div className="sm:col-span-2">
-                <dt className="opacity-60">Merknader fra tolkningen</dt>
+                <dt className="text-ink-tertiary">Merknader fra tolkningen</dt>
                 <dd>{c.extraction_notes}</dd>
               </div>
             ) : null}
@@ -241,81 +251,81 @@ export default async function KontraktDetaljPage({
             <input type="hidden" name="id" value={c.id} />
 
             <div>
-              <label className="block text-sm">
+              <label className={labelClass}>
                 Startdato
                 <input
                   type="date"
                   name="contract_start"
                   defaultValue={c.contract_start ?? ""}
-                  className="mt-1 block rounded-lg border border-black/15 px-3 py-2 dark:border-white/20 dark:bg-transparent"
+                  className={inputClass + " tabular-nums"}
                 />
               </label>
               <Belegg quotes={quotesFor(c.llm_raw, "contract_start")} />
             </div>
 
             <div>
-              <label className="block text-sm">
+              <label className={labelClass}>
                 Bindingstid utløper
                 <input
                   type="date"
                   name="binding_until"
                   defaultValue={c.binding_until ?? ""}
-                  className="mt-1 block rounded-lg border border-black/15 px-3 py-2 dark:border-white/20 dark:bg-transparent"
+                  className={inputClass + " tabular-nums"}
                 />
               </label>
               <Belegg quotes={quotesFor(c.llm_raw, "binding_until")} />
             </div>
 
             <div>
-              <label className="block text-sm">
+              <label className={labelClass}>
                 Fornyelsesdato
                 <input
                   type="date"
                   name="renewal_date"
                   defaultValue={c.renewal_date ?? ""}
-                  className="mt-1 block rounded-lg border border-black/15 px-3 py-2 dark:border-white/20 dark:bg-transparent"
+                  className={inputClass + " tabular-nums"}
                 />
               </label>
               <Belegg quotes={quotesFor(c.llm_raw, "renewal_date")} />
             </div>
 
             <div>
-              <label className="block text-sm">
+              <label className={labelClass}>
                 Avtaleperiode (måneder)
                 <input
                   type="number"
                   name="term_months"
                   min={0}
                   defaultValue={c.term_months ?? ""}
-                  className="mt-1 block w-40 rounded-lg border border-black/15 px-3 py-2 dark:border-white/20 dark:bg-transparent"
+                  className={inputClass + " w-40 tabular-nums"}
                 />
               </label>
               <Belegg quotes={quotesFor(c.llm_raw, "term_months")} />
             </div>
 
             <div>
-              <label className="block text-sm">
+              <label className={labelClass}>
                 Oppsigelsesfrist (dager)
                 <input
                   type="number"
                   name="notice_period_days"
                   min={0}
                   defaultValue={c.notice_period_days ?? ""}
-                  className="mt-1 block w-40 rounded-lg border border-black/15 px-3 py-2 dark:border-white/20 dark:bg-transparent"
+                  className={inputClass + " w-40 tabular-nums"}
                 />
               </label>
               <Belegg quotes={quotesFor(c.llm_raw, "notice_period_days")} />
             </div>
 
             <div>
-              <label className="block text-sm">
+              <label className={labelClass}>
                 Fornyes automatisk
                 <select
                   name="auto_renews"
                   defaultValue={
                     c.auto_renews === null ? "" : c.auto_renews ? "true" : "false"
                   }
-                  className="mt-1 block rounded-lg border border-black/15 px-3 py-2 dark:border-white/20 dark:bg-transparent"
+                  className={inputClass}
                 >
                   <option value="">Vet ikke</option>
                   <option value="true">Ja</option>
@@ -325,15 +335,12 @@ export default async function KontraktDetaljPage({
               <Belegg quotes={quotesFor(c.llm_raw, "auto_renews")} />
             </div>
 
-            <button
-              type="submit"
-              className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
-            >
+            <button type="submit" className={btnPrimary}>
               {c.status === "confirmed"
                 ? "Lagre endringer"
                 : "Bekreft kontrakten"}
             </button>
-            <p className="text-xs opacity-60">
+            <p className="text-xs text-ink-tertiary">
               Fristen regnes ut på nytt fra feltene når du bekrefter. Først når
               kontrakten er bekreftet kan den utløse påminnelser.
             </p>
@@ -342,11 +349,9 @@ export default async function KontraktDetaljPage({
       ) : null}
 
       {/* ── Faresone ──────────────────────────────────────────────── */}
-      <section className="mt-16 border-t border-red-500/20 pt-6">
-        <h2 className="text-sm font-semibold text-red-700 dark:text-red-300">
-          Faresone
-        </h2>
-        <p className="mt-1 text-xs opacity-60">
+      <section className="mt-16 border-t border-status-critical/25 pt-6">
+        <h2 className="text-sm font-semibold text-status-critical">Faresone</h2>
+        <p className="mt-1 text-xs text-ink-tertiary">
           Sletting fjerner kontrakten, PDF-en og alle planlagte påminnelser
           permanent. Dette kan ikke angres.
         </p>

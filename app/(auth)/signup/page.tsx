@@ -2,6 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signUp } from "../actions";
 import { getCurrentUser } from "@/lib/auth";
+import { Logo } from "@/components/brand/logo";
+import { Alert } from "@/components/ui/alert";
+import { btnPrimary } from "@/components/ui/button-styles";
+import { inputClass, labelClass } from "@/components/ui/field";
 
 /**
  * Registreringsside. Server-komponent, poster til signUp-action.
@@ -29,35 +33,38 @@ export default async function SignupPage({
 
   return (
     <main className="mx-auto max-w-sm px-6 py-16">
-      <h1 className="text-2xl font-semibold">Registrer deg</h1>
-      <p className="mt-2 text-sm opacity-70">
+      <Link href="/">
+        <Logo size="lg" />
+      </Link>
+      <h1 className="mt-8 text-2xl font-bold tracking-tight">Registrer deg</h1>
+      <p className="mt-2 text-sm text-ink-secondary">
         Opprett en konto for å komme i gang med Notisen.
       </p>
 
       {error ? (
-        <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+        <Alert variant="critical" className="mt-4">
           <p>{error}</p>
-          <p className="mt-1 opacity-80">
+          <p className="mt-1">
             Har du allerede en konto? Prøv å logge inn eller nullstille passordet.
           </p>
-        </div>
+        </Alert>
       ) : null}
 
       <form action={signUp} className="mt-6 space-y-4">
         <input type="hidden" name="next" value={nextPath} />
 
-        <label className="block text-sm">
+        <label className={labelClass}>
           E-post
           <input
             type="email"
             name="email"
             required
             autoComplete="email"
-            className="mt-1 w-full rounded-lg border border-black/15 px-3 py-2 dark:border-white/20 dark:bg-transparent"
+            className={inputClass}
           />
         </label>
 
-        <label className="block text-sm">
+        <label className={labelClass}>
           Passord
           <input
             type="password"
@@ -65,23 +72,20 @@ export default async function SignupPage({
             required
             minLength={6}
             autoComplete="new-password"
-            className="mt-1 w-full rounded-lg border border-black/15 px-3 py-2 dark:border-white/20 dark:bg-transparent"
+            className={inputClass}
           />
         </label>
 
-        <button
-          type="submit"
-          className="w-full rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
-        >
+        <button type="submit" className={btnPrimary + " w-full"}>
           Registrer deg
         </button>
       </form>
 
-      <p className="mt-6 text-sm opacity-70">
+      <p className="mt-6 text-sm text-ink-secondary">
         Har du allerede konto?{" "}
         <Link
           href={`/login?next=${encodeURIComponent(nextPath)}`}
-          className="underline"
+          className="text-accent underline"
         >
           Logg inn
         </Link>

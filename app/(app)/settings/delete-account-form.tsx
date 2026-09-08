@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { deleteAccount } from "./actions";
+import { btnDanger } from "@/components/ui/button-styles";
+import { inputClass, labelClass } from "@/components/ui/field";
 
 /**
  * Slett-konto-skjema. Ligger i "Faresone"-seksjonen på innstillingssiden.
@@ -28,7 +30,7 @@ export function DeleteAccountForm({ email }: { email: string }) {
       }}
       className="space-y-3"
     >
-      <label className="block text-sm">
+      <label className={labelClass}>
         Skriv inn e-postadressen din for å bekrefte
         <input
           type="email"
@@ -36,13 +38,13 @@ export function DeleteAccountForm({ email }: { email: string }) {
           value={value}
           onChange={(e) => setValue(e.target.value)}
           autoComplete="off"
-          className="mt-1 block w-full max-w-xs rounded-lg border border-black/15 px-3 py-2 dark:border-white/20 dark:bg-transparent"
+          className={inputClass + " max-w-xs"}
         />
       </label>
       <button
         type="submit"
         disabled={mismatch}
-        className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40 dark:text-red-300"
+        className={btnDanger + " disabled:cursor-not-allowed"}
       >
         Slett kontoen min permanent
       </button>

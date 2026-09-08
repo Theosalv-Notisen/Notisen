@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { signOut } from "@/app/(auth)/actions";
+import { Logo } from "@/components/brand/logo";
+import { btnSecondarySm } from "@/components/ui/button-styles";
 
 /**
  * Layout for de innloggede sidene (/dashboard, /settings).
@@ -13,27 +15,33 @@ export default function AppLayout({
 }) {
   return (
     <div className="min-h-screen">
-      <header className="border-b border-black/10 dark:border-white/15">
+      <header className="border-b border-border">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-          <Link href="/dashboard" className="font-semibold">
-            Notisen
+          <Link href="/dashboard">
+            <Logo size="sm" />
           </Link>
 
           <nav className="flex items-center gap-4 text-sm">
-            <Link href="/dashboard" className="opacity-80 hover:opacity-100">
+            <Link
+              href="/dashboard"
+              className="text-ink-secondary hover:text-ink"
+            >
               Oversikt
             </Link>
-            <Link href="/kontrakter" className="opacity-80 hover:opacity-100">
+            <Link
+              href="/kontrakter"
+              className="text-ink-secondary hover:text-ink"
+            >
               Kontrakter
             </Link>
-            <Link href="/settings" className="opacity-80 hover:opacity-100">
+            <Link
+              href="/settings"
+              className="text-ink-secondary hover:text-ink"
+            >
               Innstillinger
             </Link>
             <form action={signOut}>
-              <button
-                type="submit"
-                className="rounded-lg border border-black/15 px-3 py-1.5 hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
-              >
+              <button type="submit" className={btnSecondarySm}>
                 Logg ut
               </button>
             </form>

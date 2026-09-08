@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Alert } from "@/components/ui/alert";
+import { btnPrimary } from "@/components/ui/button-styles";
 
 /**
  * Knapper/poller for tolkningsflyten på detaljsiden.
@@ -49,7 +51,7 @@ export function ExtractControls({
   // Fersk tolkning pågår – bare vis at siden oppdaterer seg selv.
   if (mode === "processing" && !showStuck) {
     return (
-      <p className="mt-4 text-sm opacity-70">
+      <p className="mt-4 text-sm text-ink-secondary">
         Leser kontrakten … siden oppdaterer seg selv.
       </p>
     );
@@ -84,21 +86,17 @@ export function ExtractControls({
   return (
     <div className="mt-4 space-y-2">
       {showStuck ? (
-        <p className="rounded-lg border border-black/15 bg-black/5 p-3 text-sm dark:border-white/20 dark:bg-white/10">
+        <Alert variant="neutral">
           Dette tar lengre tid enn normalt. Tolkningen kan ha stoppet – prøv å
           kjøre den på nytt.
-        </p>
+        </Alert>
       ) : null}
-      {error ? (
-        <p className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
-          {error}
-        </p>
-      ) : null}
+      {error ? <Alert variant="critical">{error}</Alert> : null}
       <button
         type="button"
         onClick={run}
         disabled={busy}
-        className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+        className={btnPrimary}
       >
         {busy ? "Starter …" : forceRetry ? "Prøv igjen" : "Kjør uttrekk"}
       </button>

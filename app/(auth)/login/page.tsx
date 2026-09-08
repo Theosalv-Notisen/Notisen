@@ -2,6 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signIn } from "../actions";
 import { getCurrentUser } from "@/lib/auth";
+import { Logo } from "@/components/brand/logo";
+import { Alert } from "@/components/ui/alert";
+import { btnPrimary } from "@/components/ui/button-styles";
+import { inputClass, labelClass } from "@/components/ui/field";
 
 /**
  * Innloggingsside. Server-komponent, poster til signIn-action.
@@ -24,63 +28,63 @@ export default async function LoginPage({
 
   return (
     <main className="mx-auto max-w-sm px-6 py-16">
-      <h1 className="text-2xl font-semibold">Logg inn</h1>
-      <p className="mt-2 text-sm opacity-70">
+      <Link href="/">
+        <Logo size="lg" />
+      </Link>
+      <h1 className="mt-8 text-2xl font-bold tracking-tight">Logg inn</h1>
+      <p className="mt-2 text-sm text-ink-secondary">
         Logg inn for å se leverandørene dine og koble til Fiken.
       </p>
 
       {error ? (
-        <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+        <Alert variant="critical" className="mt-4">
           {error}
-        </p>
+        </Alert>
       ) : null}
 
       {slettet ? (
-        <p className="mt-4 rounded-lg border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-700 dark:text-green-300">
+        <Alert variant="good" className="mt-4">
           Kontoen din er slettet. All data og alle opplastede filer er fjernet
           permanent. Husk at du også må fjerne Notisen sin tilgang inne i Fiken
           hvis du vil trekke den helt tilbake.
-        </p>
+        </Alert>
       ) : null}
 
       <form action={signIn} className="mt-6 space-y-4">
         <input type="hidden" name="next" value={nextPath} />
 
-        <label className="block text-sm">
+        <label className={labelClass}>
           E-post
           <input
             type="email"
             name="email"
             required
             autoComplete="email"
-            className="mt-1 w-full rounded-lg border border-black/15 px-3 py-2 dark:border-white/20 dark:bg-transparent"
+            className={inputClass}
           />
         </label>
 
-        <label className="block text-sm">
+        <label className={labelClass}>
           Passord
           <input
             type="password"
             name="password"
             required
             autoComplete="current-password"
-            className="mt-1 w-full rounded-lg border border-black/15 px-3 py-2 dark:border-white/20 dark:bg-transparent"
+            className={inputClass}
           />
         </label>
 
-        <button
-          type="submit"
-          className="w-full rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
-        >
+        <button type="submit" className={btnPrimary + " w-full"}>
           Logg inn
         </button>
       </form>
 
-      <p className="mt-6 text-sm opacity-70">
+      <p className="mt-6 text-sm text-ink-secondary">
         Har du ikke konto?{" "}
         <Link
           href={`/signup?next=${encodeURIComponent(nextPath)}`}
-          className="underline"
+          className="text-accent underline"
         >
           Registrer deg
         </Link>

@@ -50,10 +50,19 @@ export async function sendReminderEmail(input: ReminderEmailInput): Promise<void
   // (dato, tall, lenke). Lenken bygges ferdig først og escapes så i sin helhet
   // før den går inn i både href="..." og lenketeksten.
   const safeLink = escapeHtml(link);
+  const deadline = escapeHtml(input.deadline);
+  const daysLeft = escapeHtml(String(input.daysLeft));
+  const c = statusColorForDays(input.daysLeft);
   const html = [
+    `<div style="background-color:#F4F0E7; padding:24px; font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; color:#201F1B">`,
+    `<div style="font-weight:700;font-size:18px;letter-spacing:-0.01em;color:#201F1B">Notisen</div>`,
+    `<div style="margin-top:16px;background-color:#FFFFFF;border:1px solid rgba(32,31,27,0.12);border-radius:12px;padding:24px">`,
     `<p>Avtalen med <strong>${escapeHtml(input.supplierName)}</strong> har en oppsigelsesfrist som nærmer seg.</p>`,
-    `<p>Si opp senest <strong>${escapeHtml(input.deadline)}</strong> for å unngå at avtalen binder eller fornyer seg videre. Det er ${escapeHtml(String(input.daysLeft))} dager igjen til fristen.</p>`,
-    `<p><a href="${safeLink}">Se kontrakten i Notisen</a></p>`,
+    `<p>Si opp senest <strong>${deadline}</strong> for å unngå at avtalen binder eller fornyer seg videre. Det er ${daysLeft} dager igjen til fristen.</p>`,
+    `<div style="border:1px solid ${c.border};background-color:${c.bg};color:${c.text};border-radius:8px;padding:12px;font-weight:500">Si opp senest ${deadline} — ${daysLeft} dager igjen</div>`,
+    `<p style="margin-top:16px"><a href="${safeLink}" style="display:inline-block;background-color:#12706A;color:#FFFFFF;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:500">Se kontrakten i Notisen</a></p>`,
+    `</div>`,
+    `</div>`,
   ].join("\n");
 
   const { error } = await resend.emails.send({
@@ -67,6 +76,27 @@ export async function sendReminderEmail(input: ReminderEmailInput): Promise<void
   if (error) {
     throw new Error(`Resend avviste e-posten: ${error.message ?? String(error)}`);
   }
+}
+
+/**
+ * Farge (inline hex) for statusboksen rundt frist-setningen, ut fra hvor
+ * mange dager det er igjen.
+ *
+ * Terskler holdes i synk med `deadlineStatus` i `lib/deadline-status.ts` og
+ * med `OFFSETS = [90, 60, 30]` i `lib/reminders.ts`. Endrer du én, endre alle.
+ */
+function statusColorForDays(daysLeft: number): {
+  text: string;
+  bg: string;
+  border: string;
+} {
+  if (daysLeft <= 30) {
+    return { text: "#C23B3B", bg: "#FAE4E4", border: "rgba(194,59,59,0.3)" };
+  }
+  if (daysLeft <= 60) {
+    return { text: "#D9922E", bg: "#FBEEDA", border: "rgba(217,146,46,0.3)" };
+  }
+  return { text: "#2F9E5C", bg: "#E3F5EA", border: "rgba(47,158,92,0.3)" };
 }
 
 /** Minimal HTML-escaping for tekst vi setter inn i e-post-markup. */

@@ -6,6 +6,9 @@ import {
 } from "@/lib/fiken-connection";
 import { FikenError } from "@/lib/fiken";
 import { DeleteAccountForm } from "./delete-account-form";
+import { Alert } from "@/components/ui/alert";
+import { btnPrimary, btnSecondary } from "@/components/ui/button-styles";
+import { card } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
 
@@ -53,10 +56,7 @@ function fikenErrorText(code: string): string {
 
 function ConnectButton({ label }: { label: string }) {
   return (
-    <a
-      href="/api/fiken/oauth/start"
-      className="inline-block rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
-    >
+    <a href="/api/fiken/oauth/start" className={btnPrimary}>
       {label}
     </a>
   );
@@ -78,43 +78,43 @@ export default async function SettingsPage({
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold">Innstillinger</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Innstillinger</h1>
 
       {fiken === "connected" ? (
-        <p className="mt-4 rounded-lg border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-700 dark:text-green-300">
+        <Alert variant="good" className="mt-4">
           Notisen er nå koblet til Fiken.
-        </p>
+        </Alert>
       ) : null}
       {fiken === "disconnected" ? (
-        <p className="mt-4 rounded-lg border border-black/15 bg-black/5 p-3 text-sm dark:border-white/20 dark:bg-white/10">
+        <Alert variant="neutral" className="mt-4">
           Fiken-tilkoblingen er fjernet fra Notisen. Husk at du også må fjerne
           Notisen sin tilgang inne i Fiken hvis du vil trekke den helt tilbake.
-        </p>
+        </Alert>
       ) : null}
       {fiken === "disconnect_failed" ? (
-        <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+        <Alert variant="critical" className="mt-4">
           Klarte ikke koble fra Fiken nå. Prøv igjen om litt.
-        </p>
+        </Alert>
       ) : null}
       {fiken_error ? (
-        <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+        <Alert variant="critical" className="mt-4">
           {fikenErrorText(fiken_error)}
-        </p>
+        </Alert>
       ) : null}
       {slett_feil ? (
-        <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+        <Alert variant="critical" className="mt-4">
           {slett_feil === "bekreftelse"
             ? "E-posten du skrev inn stemmer ikke."
             : "Klarte ikke fullføre slettingen. Kontoen din er fortsatt aktiv – prøv igjen om litt."}
-        </p>
+        </Alert>
       ) : null}
 
-      <section className="mt-8 rounded-xl border border-black/10 p-6 dark:border-white/15">
+      <section className={card + " mt-8"}>
         <h2 className="font-medium">Fiken</h2>
 
         {status.kind === "not_connected" ? (
           <div className="mt-3 space-y-4">
-            <p className="text-sm opacity-70">
+            <p className="text-sm text-ink-secondary">
               Ikke koblet til. Koble til Fiken for å hente leverandører og kjøp.
             </p>
             <ConnectButton label="Koble til Fiken" />
@@ -123,17 +123,14 @@ export default async function SettingsPage({
 
         {status.kind === "connected" ? (
           <div className="mt-3 space-y-4">
-            <p className="text-sm opacity-70">
+            <p className="text-sm text-ink-secondary">
               Koblet til Fiken. Selskaper:{" "}
               {status.companies.length > 0
                 ? status.companies.join(", ")
                 : "(ingen selskaper funnet)"}
             </p>
             <form action="/api/fiken/disconnect" method="post">
-              <button
-                type="submit"
-                className="rounded-lg border border-black/15 px-4 py-2 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
-              >
+              <button type="submit" className={btnSecondary}>
                 Koble fra
               </button>
             </form>
@@ -142,7 +139,7 @@ export default async function SettingsPage({
 
         {status.kind === "reauth" ? (
           <div className="mt-3 space-y-4">
-            <p className="text-sm opacity-70">
+            <p className="text-sm text-ink-secondary">
               Tilkoblingen til Fiken har utløpt. Koble til på nytt for å fortsette.
             </p>
             <ConnectButton label="Koble til Fiken på nytt" />
@@ -151,20 +148,16 @@ export default async function SettingsPage({
 
         {status.kind === "error" ? (
           <div className="mt-3 space-y-4">
-            <p className="text-sm text-red-700 dark:text-red-300">
-              {status.message}
-            </p>
+            <p className="text-sm text-status-critical">{status.message}</p>
             <ConnectButton label="Koble til Fiken" />
           </div>
         ) : null}
       </section>
 
       {/* ── Faresone ──────────────────────────────────────────────── */}
-      <section className="mt-16 border-t border-red-500/20 pt-6">
-        <h2 className="text-sm font-semibold text-red-700 dark:text-red-300">
-          Faresone
-        </h2>
-        <p className="mt-1 text-xs opacity-60">
+      <section className="mt-16 border-t border-status-critical/25 pt-6">
+        <h2 className="text-sm font-semibold text-status-critical">Faresone</h2>
+        <p className="mt-1 text-xs text-ink-tertiary">
           Sletting fjerner kontoen din, alle kontrakter, alle leverandører og
           alle opplastede PDF-er permanent. Dette kan ikke angres. Husk at du
           også må fjerne Notisen sin tilgang inne i Fiken hvis du vil trekke den
@@ -174,7 +167,7 @@ export default async function SettingsPage({
           {user.email ? (
             <DeleteAccountForm email={user.email} />
           ) : (
-            <p className="text-xs opacity-60">
+            <p className="text-xs text-ink-tertiary">
               Sletting av konto krever en registrert e-postadresse. Ta kontakt så
               hjelper vi deg.
             </p>

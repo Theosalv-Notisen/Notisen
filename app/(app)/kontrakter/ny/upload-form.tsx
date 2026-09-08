@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Alert } from "@/components/ui/alert";
+import { btnPrimary } from "@/components/ui/button-styles";
+import { labelClass } from "@/components/ui/field";
 
 /**
  * Laster opp PDF-en via fetch (ikke vanlig form-post) fordi
@@ -59,36 +62,28 @@ export function UploadForm({
   return (
     <form onSubmit={onSubmit} className="mt-6 space-y-4">
       {sessionExpired ? (
-        <p className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+        <Alert variant="critical">
           Økten din er utløpt.{" "}
           <a href="/login?next=/kontrakter" className="underline">
             Logg inn på nytt
           </a>
           .
-        </p>
+        </Alert>
       ) : null}
-      {error ? (
-        <p className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
-          {error}
-        </p>
-      ) : null}
+      {error ? <Alert variant="critical">{error}</Alert> : null}
 
-      <label className="block text-sm">
+      <label className={labelClass}>
         Kontrakt-PDF (maks 4 MB)
         <input
           type="file"
           name="file"
           accept="application/pdf"
           required
-          className="mt-1 block w-full text-sm file:mr-3 file:rounded-lg file:border file:border-black/15 file:px-3 file:py-1.5 file:text-sm dark:file:border-white/20"
+          className="mt-1 block w-full text-sm text-ink-secondary file:mr-3 file:rounded-lg file:border file:border-border file:px-3 file:py-1.5 file:text-sm"
         />
       </label>
 
-      <button
-        type="submit"
-        disabled={busy}
-        className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
-      >
+      <button type="submit" disabled={busy} className={btnPrimary}>
         {busy ? "Laster opp …" : "Last opp kontrakt"}
       </button>
     </form>

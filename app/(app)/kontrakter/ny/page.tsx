@@ -7,6 +7,7 @@ import {
 } from "@/lib/fiken-connection";
 import { FikenError, type FikenContact } from "@/lib/fiken";
 import { UploadForm } from "./upload-form";
+import { Alert } from "@/components/ui/alert";
 
 export const dynamic = "force-dynamic";
 
@@ -37,9 +38,9 @@ async function lookupContact(
 
 function Melding({ children }: { children: React.ReactNode }) {
   return (
-    <p className="mt-8 rounded-xl border border-black/10 p-6 text-sm opacity-75 dark:border-white/15">
+    <Alert variant="neutral" className="mt-8">
       {children}
-    </p>
+    </Alert>
   );
 }
 
@@ -55,10 +56,10 @@ export default async function NyKontraktPage({
   if (!company || !contact || !Number.isFinite(contactId)) {
     return (
       <div>
-        <h1 className="text-2xl font-semibold">Last opp kontrakt</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Last opp kontrakt</h1>
         <Melding>
           Mangler informasjon om hvilken leverandør kontrakten gjelder. Gå til{" "}
-          <Link href="/dashboard" className="underline">
+          <Link href="/dashboard" className="text-accent underline">
             oversikten
           </Link>{" "}
           og velg «Last opp kontrakt» på en leverandør.
@@ -71,15 +72,13 @@ export default async function NyKontraktPage({
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold">Last opp kontrakt</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Last opp kontrakt</h1>
 
       {result.kind === "ok" ? (
         <>
-          <p className="mt-2 text-sm opacity-70">
+          <p className="mt-2 text-sm text-ink-secondary">
             Leverandør:{" "}
-            <span className="font-medium opacity-100">
-              {result.contact.name}
-            </span>
+            <span className="font-medium text-ink">{result.contact.name}</span>
             {result.contact.organizationNumber
               ? ` · org.nr ${result.contact.organizationNumber}`
               : ""}
@@ -98,7 +97,7 @@ export default async function NyKontraktPage({
       {result.kind === "not_connected" ? (
         <Melding>
           Du må koble til Fiken først. Gå til{" "}
-          <Link href="/settings" className="underline">
+          <Link href="/settings" className="text-accent underline">
             innstillinger
           </Link>
           .
@@ -108,7 +107,7 @@ export default async function NyKontraktPage({
       {result.kind === "reauth" ? (
         <Melding>
           Fiken-tilkoblingen har utløpt. Forny den under{" "}
-          <Link href="/settings" className="underline">
+          <Link href="/settings" className="text-accent underline">
             innstillinger
           </Link>
           .

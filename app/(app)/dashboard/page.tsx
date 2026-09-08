@@ -11,6 +11,9 @@ import {
   type Confidence,
   type SupplierRecurrence,
 } from "@/lib/recurring";
+import { Alert } from "@/components/ui/alert";
+import { btnPrimary } from "@/components/ui/button-styles";
+import { card, cardTight } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
 
@@ -74,29 +77,27 @@ function SupplierCard({
   return (
     <li
       className={
-        "rounded-xl border p-4 " +
-        (highlight
-          ? "border-black/25 bg-black/5 dark:border-white/30 dark:bg-white/10"
-          : "border-black/10 dark:border-white/15")
+        "rounded-xl border p-4 bg-surface " +
+        (highlight ? "border-accent bg-accent-tint" : "border-border")
       }
     >
       <div className="flex items-start justify-between gap-4">
         <h3 className="font-medium">{row.supplierName}</h3>
-        <span className="shrink-0 rounded-full border border-black/15 px-2 py-0.5 text-xs dark:border-white/20">
+        <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-xs text-ink-secondary">
           {BADGE_TEXT[row.confidence]}
         </span>
       </div>
 
-      <p className="mt-2 text-sm opacity-75">{row.reason}</p>
+      <p className="mt-2 text-sm text-ink-secondary">{row.reason}</p>
 
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
         <div>
-          <dt className="opacity-60">Antall kjøp</dt>
-          <dd>{row.occurrences}</dd>
+          <dt className="text-ink-tertiary">Antall kjøp</dt>
+          <dd className="tabular-nums">{row.occurrences}</dd>
         </div>
         <div>
-          <dt className="opacity-60">Intervall</dt>
-          <dd>
+          <dt className="text-ink-tertiary">Intervall</dt>
+          <dd className="tabular-nums">
             {row.cadence
               ? row.cadence.label
               : row.medianGapDays != null
@@ -105,12 +106,14 @@ function SupplierCard({
           </dd>
         </div>
         <div>
-          <dt className="opacity-60">Dager mellom</dt>
-          <dd>{row.medianGapDays != null ? row.medianGapDays : "–"}</dd>
+          <dt className="text-ink-tertiary">Dager mellom</dt>
+          <dd className="tabular-nums">
+            {row.medianGapDays != null ? row.medianGapDays : "–"}
+          </dd>
         </div>
         <div>
-          <dt className="opacity-60">Typisk beløp</dt>
-          <dd>{formatNok(row.medianAmountNok)}</dd>
+          <dt className="text-ink-tertiary">Typisk beløp</dt>
+          <dd className="tabular-nums">{formatNok(row.medianAmountNok)}</dd>
         </div>
       </dl>
 
@@ -118,7 +121,7 @@ function SupplierCard({
         href={`/kontrakter/ny?company=${encodeURIComponent(
           companySlug,
         )}&contact=${row.supplierId}`}
-        className="mt-3 inline-block rounded-lg border border-black/15 px-3 py-1.5 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
+        className="mt-3 inline-block rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-accent-tint"
       >
         Last opp kontrakt
       </Link>
@@ -133,16 +136,13 @@ export default async function DashboardPage() {
   if (data.kind === "not_connected") {
     return (
       <div>
-        <h1 className="text-2xl font-semibold">Oversikt</h1>
-        <div className="mt-8 rounded-xl border border-black/10 p-6 dark:border-white/15">
-          <p className="text-sm opacity-75">
+        <h1 className="text-2xl font-bold tracking-tight">Oversikt</h1>
+        <div className={card + " mt-8"}>
+          <p className="text-sm text-ink-secondary">
             Du har ikke koblet til Fiken enda. Koble til for å se leverandørene
             dine og hvilke som ser ut som løpende avtaler.
           </p>
-          <Link
-            href="/settings"
-            className="mt-4 inline-block rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
-          >
+          <Link href="/settings" className={btnPrimary + " mt-4"}>
             Gå til innstillinger
           </Link>
         </div>
@@ -153,16 +153,13 @@ export default async function DashboardPage() {
   if (data.kind === "reauth") {
     return (
       <div>
-        <h1 className="text-2xl font-semibold">Oversikt</h1>
-        <div className="mt-8 rounded-xl border border-black/10 p-6 dark:border-white/15">
-          <p className="text-sm opacity-75">
+        <h1 className="text-2xl font-bold tracking-tight">Oversikt</h1>
+        <div className={card + " mt-8"}>
+          <p className="text-sm text-ink-secondary">
             Tilkoblingen til Fiken har utløpt. Du må fornye tilkoblingen for å se
             oppdaterte tall.
           </p>
-          <Link
-            href="/settings"
-            className="mt-4 inline-block rounded-lg bg-black px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
-          >
+          <Link href="/settings" className={btnPrimary + " mt-4"}>
             Forny tilkobling
           </Link>
         </div>
@@ -173,10 +170,10 @@ export default async function DashboardPage() {
   if (data.kind === "fiken_error") {
     return (
       <div>
-        <h1 className="text-2xl font-semibold">Oversikt</h1>
-        <p className="mt-8 rounded-xl border border-black/10 p-6 text-sm opacity-75 dark:border-white/15">
+        <h1 className="text-2xl font-bold tracking-tight">Oversikt</h1>
+        <Alert variant="neutral" className="mt-8">
           Klarte ikke hente data fra Fiken nå. Prøv igjen om litt.
-        </p>
+        </Alert>
       </div>
     );
   }
@@ -184,26 +181,26 @@ export default async function DashboardPage() {
   if (data.kind === "error") {
     return (
       <div>
-        <h1 className="text-2xl font-semibold">Oversikt</h1>
-        <p className="mt-8 rounded-xl border border-black/10 p-6 text-sm opacity-75 dark:border-white/15">
+        <h1 className="text-2xl font-bold tracking-tight">Oversikt</h1>
+        <Alert variant="critical" className="mt-8">
           Noe gikk galt da vi hentet dataene dine. Prøv igjen om litt.
-        </p>
+        </Alert>
       </div>
     );
   }
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold">Oversikt</h1>
-      <p className="mt-2 text-sm opacity-70">
+      <h1 className="text-2xl font-bold tracking-tight">Oversikt</h1>
+      <p className="mt-2 text-sm text-ink-secondary">
         Leverandører fra Fiken, sortert etter hvor sannsynlig det er at de er en
         løpende avtale.
       </p>
 
       {data.companies.length === 0 ? (
-        <p className="mt-8 text-sm opacity-75">
+        <div className={cardTight + " mt-8 text-sm text-ink-secondary"}>
           Fant ingen selskaper i Fiken-tilkoblingen.
-        </p>
+        </div>
       ) : null}
 
       {data.companies.map((company) => (
@@ -211,7 +208,7 @@ export default async function DashboardPage() {
           <h2 className="font-medium">{company.name}</h2>
 
           {company.rows.length === 0 ? (
-            <p className="mt-2 text-sm opacity-60">
+            <p className="mt-2 text-sm text-ink-tertiary">
               Ingen kjøp med leverandør å analysere.
             </p>
           ) : (
