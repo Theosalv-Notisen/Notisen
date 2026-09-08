@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { signOut } from "@/app/(auth)/actions";
 import { Logo } from "@/components/brand/logo";
+import { NavLinks } from "@/components/app/nav-links";
 import { btnSecondarySm } from "@/components/ui/button-styles";
 
 /**
@@ -22,24 +23,7 @@ export default function AppLayout({
           </Link>
 
           <nav className="flex items-center gap-4 text-sm">
-            <Link
-              href="/dashboard"
-              className="text-ink-secondary hover:text-ink"
-            >
-              Oversikt
-            </Link>
-            <Link
-              href="/kontrakter"
-              className="text-ink-secondary hover:text-ink"
-            >
-              Kontrakter
-            </Link>
-            <Link
-              href="/settings"
-              className="text-ink-secondary hover:text-ink"
-            >
-              Innstillinger
-            </Link>
+            <NavLinks />
             <form action={signOut}>
               <button type="submit" className={btnSecondarySm}>
                 Logg ut

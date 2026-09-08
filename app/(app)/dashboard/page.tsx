@@ -12,7 +12,7 @@ import {
   type SupplierRecurrence,
 } from "@/lib/recurring";
 import { Alert } from "@/components/ui/alert";
-import { btnPrimary } from "@/components/ui/button-styles";
+import { btnPrimary, btnSecondarySm } from "@/components/ui/button-styles";
 import { card, cardTight } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +22,14 @@ const BADGE_TEXT: Record<Confidence, string> = {
   medium: "Mulig løpende",
   low: "Muligens løpende (usikker)",
   none: "Engangs",
+};
+
+/** Fylt statuspille: grønn for løpende-kandidatene, nøytral grå for resten. */
+const BADGE_CLASS: Record<Confidence, string> = {
+  high: "bg-accent-tint text-accent-hover",
+  medium: "bg-accent-tint text-accent-hover",
+  low: "bg-ink/5 text-ink-secondary",
+  none: "bg-ink/5 text-ink-secondary",
 };
 
 type CompanyRows = {
@@ -77,20 +85,27 @@ function SupplierCard({
   return (
     <li
       className={
-        "rounded-xl border p-4 bg-surface " +
-        (highlight ? "border-accent bg-accent-tint" : "border-border")
+        "rounded-xl border p-4 " +
+        (highlight
+          ? "border-accent bg-accent-tint shadow-sm"
+          : "border-border bg-surface")
       }
     >
       <div className="flex items-start justify-between gap-4">
         <h3 className="font-medium">{row.supplierName}</h3>
-        <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-xs text-ink-secondary">
+        <span
+          className={
+            "shrink-0 rounded-full px-2 py-0.5 text-xs " +
+            BADGE_CLASS[row.confidence]
+          }
+        >
           {BADGE_TEXT[row.confidence]}
         </span>
       </div>
 
       <p className="mt-2 text-sm text-ink-secondary">{row.reason}</p>
 
-      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
+      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 border-t border-border pt-3 text-sm sm:grid-cols-4">
         <div>
           <dt className="text-ink-tertiary">Antall kjøp</dt>
           <dd className="tabular-nums">{row.occurrences}</dd>
@@ -121,7 +136,7 @@ function SupplierCard({
         href={`/kontrakter/ny?company=${encodeURIComponent(
           companySlug,
         )}&contact=${row.supplierId}`}
-        className="mt-3 inline-block rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-accent-tint"
+        className={(highlight ? btnPrimary : btnSecondarySm) + " mt-4"}
       >
         Last opp kontrakt
       </Link>
@@ -189,6 +204,10 @@ export default async function DashboardPage() {
     );
   }
 
+  const allRows = data.companies.flatMap((c) => c.rows);
+  const supplierCount = allRows.length;
+  const likelyCount = allRows.filter((r) => r.isLikelyRecurring).length;
+
   return (
     <div>
       <h1 className="text-2xl font-bold tracking-tight">Oversikt</h1>
@@ -196,6 +215,22 @@ export default async function DashboardPage() {
         Leverandører fra Fiken, sortert etter hvor sannsynlig det er at de er en
         løpende avtale.
       </p>
+
+      {supplierCount > 0 ? (
+        <p className="mt-4 text-sm text-ink-secondary">
+          <span className="font-medium text-ink tabular-nums">
+            {supplierCount}
+          </span>{" "}
+          {supplierCount === 1 ? "leverandør" : "leverandører"} fra Fiken
+          {" · "}
+          <span className="font-medium text-ink tabular-nums">
+            {likelyCount}
+          </span>{" "}
+          {likelyCount === 1
+            ? "sannsynlig løpende avtale"
+            : "sannsynlige løpende avtaler"}
+        </p>
+      ) : null}
 
       {data.companies.length === 0 ? (
         <div className={cardTight + " mt-8 text-sm text-ink-secondary"}>
