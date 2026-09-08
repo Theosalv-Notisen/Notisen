@@ -2,26 +2,32 @@
  * Notisen-ordmerke: kalenderikon + tekst. Server-komponent, ingen lenke inni –
  * kalleren pakker den i <Link> der det trengs.
  */
+type LogoSize = "sm" | "md" | "lg";
+
 type LogoProps = {
-  size?: "sm" | "lg";
+  size?: LogoSize;
   className?: string;
 };
 
+const SIZES: Record<LogoSize, { icon: number; gap: string; word: string }> = {
+  sm: { icon: 20, gap: "gap-1.5", word: "text-base" },
+  md: { icon: 24, gap: "gap-2", word: "text-lg" },
+  lg: { icon: 30, gap: "gap-2", word: "text-xl" },
+};
+
 export function Logo({ size = "sm", className }: LogoProps) {
-  const iconPx = size === "lg" ? 30 : 20;
-  const wordClass =
-    size === "lg" ? "text-xl font-bold tracking-tight" : "text-base font-bold tracking-tight";
+  const s = SIZES[size];
 
   return (
     <span
       className={
-        "inline-flex items-center gap-1.5 text-ink" +
+        `inline-flex items-center ${s.gap} text-ink` +
         (className ? " " + className : "")
       }
     >
       <svg
-        width={iconPx}
-        height={iconPx}
+        width={s.icon}
+        height={s.icon}
         viewBox="0 0 64 64"
         fill="none"
         aria-hidden="true"
@@ -50,7 +56,7 @@ export function Logo({ size = "sm", className }: LogoProps) {
         <path d="M10 24 H54" stroke="currentColor" strokeWidth="4" />
         <circle cx="40" cy="40" r="5.5" fill="#12706A" />
       </svg>
-      <span className={wordClass}>Notisen</span>
+      <span className={`${s.word} font-bold tracking-tight`}>Notisen</span>
     </span>
   );
 }
