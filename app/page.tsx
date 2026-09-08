@@ -41,7 +41,7 @@ export default function Home() {
     <div className="flex min-h-screen flex-col">
       <header className="border-b border-border">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-          <Logo size="md" />
+          <Logo size="xl" />
           <Link href="/login" className={btnSecondarySm}>
             Logg inn
           </Link>

@@ -2,7 +2,7 @@
  * Notisen-ordmerke: kalenderikon + tekst. Server-komponent, ingen lenke inni –
  * kalleren pakker den i <Link> der det trengs.
  */
-type LogoSize = "sm" | "md" | "lg";
+type LogoSize = "sm" | "md" | "lg" | "xl";
 
 type LogoProps = {
   size?: LogoSize;
@@ -13,6 +13,7 @@ const SIZES: Record<LogoSize, { icon: number; gap: string; word: string }> = {
   sm: { icon: 20, gap: "gap-1.5", word: "text-base" },
   md: { icon: 24, gap: "gap-2", word: "text-lg" },
   lg: { icon: 30, gap: "gap-2", word: "text-xl" },
+  xl: { icon: 40, gap: "gap-2.5", word: "text-3xl" },
 };
 
 export function Logo({ size = "sm", className }: LogoProps) {
