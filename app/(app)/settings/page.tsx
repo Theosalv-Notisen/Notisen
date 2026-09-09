@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { requireUser } from "@/lib/auth";
 import {
   FikenReauthRequiredError,
@@ -33,6 +34,7 @@ async function loadFikenStatus(): Promise<FikenStatus> {
       };
     }
     console.error("Uventet feil ved henting av Fiken-status:", err);
+    Sentry.captureException(err, { tags: { area: "settings" } });
     return {
       kind: "error",
       message: "Noe gikk galt da vi hentet Fiken-status. Prøv igjen om litt.",

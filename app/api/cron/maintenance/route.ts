@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isAuthorizedCron } from "@/lib/cron-auth";
 import { runMaintenance } from "@/lib/contract-maintenance";
@@ -38,9 +39,19 @@ export async function GET(request: Request) {
     // Logg oppsummeringen så den er synlig i Vercel-loggen (tellere for
     // roll-forward, draft-opprydding osv. + evt. `errors`).
     console.log("maintenance-cron:", JSON.stringify(summary));
+
+    if (summary.errors.length > 0) {
+      console.error("Maintenance-cron delvis feil:", summary.errors);
+      Sentry.captureMessage(
+        `Maintenance-cron: ${summary.errors.length} feil`,
+        { level: "error", tags: { cron: "maintenance" }, extra: { summary } },
+      );
+    }
+
     return NextResponse.json({ ok: true, ...summary });
   } catch (err) {
     console.error("Maintenance-cron feilet uventet:", err);
+    Sentry.captureException(err, { tags: { cron: "maintenance" } });
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 },

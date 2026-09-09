@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { unstable_cache } from "next/cache";
+import * as Sentry from "@sentry/nextjs";
 import { getCurrentUser, requireUser } from "@/lib/auth";
 import {
   FikenReauthRequiredError,
@@ -85,6 +86,7 @@ async function loadDashboard(): Promise<DashboardData> {
     if (err instanceof FikenReauthRequiredError) return { kind: "reauth" };
     if (err instanceof FikenError) return { kind: "fiken_error" };
     console.error("Uventet feil ved lasting av dashboard:", err);
+    Sentry.captureException(err, { tags: { area: "dashboard" } });
     return { kind: "error" };
   }
 }

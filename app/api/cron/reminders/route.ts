@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isAuthorizedCron } from "@/lib/cron-auth";
 import { runReminders } from "@/lib/reminders";
@@ -35,9 +36,21 @@ export async function GET(request: Request) {
       },
       sendReminderEmail,
     });
+
+    // Ikke-fatale feil (en e-post som ikke gikk gjennom, en rad som feilet) –
+    // cronen fullførte, men noe bør sees på.
+    if (summary.errors.length > 0) {
+      console.error("Reminders-cron delvis feil:", summary.errors);
+      Sentry.captureMessage(
+        `Reminders-cron: ${summary.errors.length} feil, ${summary.failed} varsler mislyktes`,
+        { level: "error", tags: { cron: "reminders" }, extra: { summary } },
+      );
+    }
+
     return NextResponse.json({ ok: true, ...summary });
   } catch (err) {
     console.error("Reminders-cron feilet uventet:", err);
+    Sentry.captureException(err, { tags: { cron: "reminders" } });
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 },

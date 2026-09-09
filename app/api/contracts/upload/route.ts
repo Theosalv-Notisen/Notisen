@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { createClient } from "@/lib/supabase/server";
 import { isSameOrigin } from "@/lib/csrf";
 import { errorResponse } from "@/lib/api-errors";
@@ -148,6 +149,9 @@ export async function POST(request: Request) {
       // Rydd opp: uten fil er contract-raden verdiløs.
       await supabase.from("contract").delete().eq("id", contractId);
       console.error("Opplasting til storage feilet:", upload.error);
+      Sentry.captureException(upload.error, {
+        tags: { area: "storage-upload" },
+      });
       return NextResponse.json(
         { error: "Klarte ikke lagre PDF-en. Prøv igjen." },
         { status: 502 },
@@ -175,6 +179,7 @@ export async function POST(request: Request) {
         console.error("Klarte ikke slette contract-rad etter statusfeil:", cleanupErr);
       }
       console.error("Klarte ikke sette status=uploaded:", statusErr);
+      Sentry.captureException(statusErr, { tags: { area: "storage-upload" } });
       return NextResponse.json(
         { error: "Klarte ikke fullføre opplastingen. Prøv igjen." },
         { status: 502 },

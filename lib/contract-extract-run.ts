@@ -11,6 +11,7 @@
 
 import "server-only";
 
+import * as Sentry from "@sentry/nextjs";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { extractContractTerms } from "./contract-extract.ts";
 import {
@@ -157,17 +158,28 @@ export async function runExtraction(
     let message =
       "Klarte ikke tolke PDF-en. Prøv igjen – hjelper det ikke, kan PDF-en " +
       "være skadet eller i et format vi ikke klarer å lese.";
+    // `expected` = kjente feil vi ikke trenger å bli varslet om (dårlig PDF,
+    // Anthropic midlertidig opptatt). Ukjente feil rapporteres som `error`.
+    let expected = false;
     if (/overloaded|rate.?limit|\b429\b|\b529\b/i.test(raw)) {
       message =
         "Tolkningstjenesten er opptatt akkurat nå. Vent noen minutter og prøv igjen.";
+      expected = true;
     } else if (/not a? valid|invalid_request|base64|corrupt/i.test(raw)) {
       message =
         "PDF-en ser ut til å være skadet eller ufullstendig. Last opp filen på nytt.";
+      expected = true;
     } else if (/laste ned PDF/i.test(raw)) {
       message = "Klarte ikke hente PDF-en fra lageret. Prøv igjen om litt.";
     } else if (/kalte ikke verktøyet|gyldig input-objekt/i.test(raw)) {
       message = "Tolkningen ga et ufullstendig svar. Prøv igjen.";
     }
+
+    Sentry.captureException(extractErr, {
+      level: expected ? "warning" : "error",
+      tags: { area: "claude-extract" },
+      extra: { contractId: id },
+    });
 
     await supabase
       .from("contract")

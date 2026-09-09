@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import * as Sentry from "@sentry/nextjs";
 import { exchangeCodeForTokens } from "@/lib/fiken-oauth";
 import { env } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
@@ -61,6 +62,7 @@ export async function GET(request: Request) {
     // Detaljen kan inneholde rå respons fra Fikens token-endepunkt – logg den,
     // men vis kun en generisk kode til brukeren.
     console.error("Fiken OAuth callback feilet:", err);
+    Sentry.captureException(err, { tags: { area: "fiken-oauth" } });
     return back("fiken_error=exchange_failed");
   }
 }
