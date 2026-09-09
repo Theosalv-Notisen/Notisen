@@ -60,7 +60,7 @@ export default async function NyKontraktPage({
         <Melding>
           Mangler informasjon om hvilken leverandør kontrakten gjelder. Gå til{" "}
           <Link href="/dashboard" className="text-accent underline">
-            oversikten
+            Finn avtaler
           </Link>{" "}
           og velg «Last opp kontrakt» på en leverandør.
         </Melding>

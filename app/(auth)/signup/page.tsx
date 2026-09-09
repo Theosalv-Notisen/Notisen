@@ -23,10 +23,10 @@ export default async function SignupPage({
 }: {
   searchParams: Promise<{ next?: string; feil?: string }>;
 }) {
-  if (await getCurrentUser()) redirect("/dashboard");
+  if (await getCurrentUser()) redirect("/kontrakter");
 
   const { next, feil } = await searchParams;
-  const nextPath = next ?? "/dashboard";
+  const nextPath = next ?? "/kontrakter";
   const error = feil
     ? (FEIL_TEKST[feil] ?? "Kunne ikke opprette bruker.")
     : null;

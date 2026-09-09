@@ -18,7 +18,7 @@ export default function AppLayout({
     <div className="min-h-screen">
       <header className="border-b border-border">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-          <Link href="/dashboard">
+          <Link href="/kontrakter">
             <Logo size="xl" />
           </Link>
 

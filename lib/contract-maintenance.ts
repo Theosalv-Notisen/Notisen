@@ -216,17 +216,28 @@ async function rollForwardDeadlines(
   const today = now.toISOString().slice(0, 10);
   const cutoff = addDaysIso(today, -DEADLINE_ROLL_GRACE_DAYS);
 
-  const { data, error } = await supabase
-    .from("contract")
-    .select(
-      "id, contract_start, term_months, binding_until, auto_renews, renewal_date, notice_period_days, next_deadline",
-    )
-    .eq("status", "confirmed")
-    .eq("needs_review", false)
-    .not("next_deadline", "is", null)
-    .lt("next_deadline", cutoff)
-    .order("next_deadline", { ascending: true })
-    .limit(MAX_ROLL_FORWARD);
+  const rollSelect =
+    "id, contract_start, term_months, binding_until, auto_renews, renewal_date, notice_period_days, next_deadline";
+  const rollQuery = (withArchived: boolean) => {
+    let q = supabase
+      .from("contract")
+      .select(rollSelect)
+      .eq("status", "confirmed")
+      .eq("needs_review", false)
+      .not("next_deadline", "is", null)
+      .lt("next_deadline", cutoff)
+      .order("next_deadline", { ascending: true })
+      .limit(MAX_ROLL_FORWARD);
+    if (withArchived) q = q.is("archived_at", null);
+    return q;
+  };
+
+  let { data, error } = await rollQuery(true);
+  // `archived_at` ikke migrert inn ennå → kjør uten filteret (ingen arkiverte
+  // kontrakter finnes uansett før kolonnen er der).
+  if (error && /archived_at/.test(error.message)) {
+    ({ data, error } = await rollQuery(false));
+  }
 
   if (error) {
     summary.errors.push(`Henting av passerte frister feilet: ${error.message}`);

@@ -181,3 +181,51 @@ export async function deleteContract(formData: FormData) {
   revalidatePath("/kontrakter");
   redirect("/kontrakter");
 }
+
+/**
+ * Marker en avtale som avsluttet (sagt opp / gått ut), eller gjenåpne den.
+ * En avsluttet kontrakt varsles ikke og rulles ikke fram, men beholdes for
+ * historikk. `mode` styres av knappen på detaljsiden.
+ */
+async function setArchived(formData: FormData, archived: boolean) {
+  const id = emptyToNull(formData.get("id"));
+  if (!id) redirect("/kontrakter");
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect(`/login?next=/kontrakter/${id}`);
+
+  const { data: updated, error } = await supabase
+    .from("contract")
+    .update({
+      archived_at: archived ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    if (/archived_at/.test(error.message)) {
+      // Kolonnen er ikke migrert inn ennå.
+      redirect(`/kontrakter/${id}?feil=arkiv_migrasjon`);
+    }
+    throw error;
+  }
+  if (!updated) redirect(`/kontrakter/${id}?feil=arkiv`);
+
+  revalidatePath(`/kontrakter/${id}`);
+  revalidatePath("/kontrakter");
+  redirect(`/kontrakter/${id}?${archived ? "avsluttet=1" : "gjenapnet=1"}`);
+}
+
+export async function archiveContract(formData: FormData) {
+  return setArchived(formData, true);
+}
+
+export async function unarchiveContract(formData: FormData) {
+  return setArchived(formData, false);
+}

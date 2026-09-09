@@ -74,12 +74,9 @@ type SeededContract = {
   reminderOffsets?: number[] | null;
 };
 
-/** Finnes `reminder_offsets`-kolonnen? (Migrasjonen kjørt?) */
-async function reminderOffsetsColumnExists(): Promise<boolean> {
-  const { error } = await admin
-    .from("contract")
-    .select("reminder_offsets")
-    .limit(1);
+/** Finnes en valgfri kolonne på `contract`? (Migrasjonen kjørt?) */
+async function contractColumnExists(name: string): Promise<boolean> {
+  const { error } = await admin.from("contract").select(name).limit(1);
   return !error;
 }
 
@@ -108,11 +105,18 @@ async function main() {
       throw new Error(`Klarte ikke lage supplier: ${supplierErr?.message}`);
     }
 
-    const hasOffsetsColumn = await reminderOffsetsColumnExists();
+    const hasOffsetsColumn = await contractColumnExists("reminder_offsets");
+    const hasArchivedColumn = await contractColumnExists("archived_at");
     check(
       hasOffsetsColumn
         ? "reminder_offsets-kolonnen finnes – kjører per-kontrakt-tersklene også"
         : "reminder_offsets-kolonnen mangler – hopper over per-kontrakt-cases (kjør migrasjonen)",
+      true,
+    );
+    check(
+      hasArchivedColumn
+        ? "archived_at-kolonnen finnes – kjører arkivert-casen også"
+        : "archived_at-kolonnen mangler – hopper over arkivert-casen (kjør migrasjonen)",
       true,
     );
 
@@ -171,6 +175,14 @@ async function main() {
         },
       );
     }
+    if (hasArchivedColumn) {
+      seeds.push({
+        key: "cArchived",
+        status: "confirmed",
+        needsReview: false,
+        deadline: plusDays(5),
+      });
+    }
 
     for (const seed of seeds) {
       const insert: Record<string, unknown> = {
@@ -194,6 +206,13 @@ async function main() {
         throw new Error(`Klarte ikke lage contract ${seed.key}: ${rowErr?.message}`);
       }
       contractIds.set(seed.key, row.id);
+    }
+
+    if (hasArchivedColumn) {
+      await admin
+        .from("contract")
+        .update({ archived_at: new Date().toISOString() })
+        .eq("id", contractIds.get("cArchived")!);
     }
 
     // ── Case 8: confirmed-kontrakt uten supplier-rad ─────────────────
@@ -420,6 +439,18 @@ async function main() {
         "Per-kontrakt – cNull reminder_log = [7, 30, 90]",
         JSON.stringify(await logRows(id("cNull"))) === JSON.stringify([7, 30, 90]),
         `logg = ${JSON.stringify(await logRows(id("cNull")))}`,
+      );
+    }
+
+    if (hasArchivedColumn) {
+      check(
+        "Arkivert – cArchived (avsluttet, frist +5) sender 0 e-poster",
+        emailsFor(sent1, "cArchived").length === 0,
+        `fikk ${emailsFor(sent1, "cArchived").length}`,
+      );
+      check(
+        "Arkivert – cArchived ingen reminder_log",
+        (await logRows(id("cArchived"))).length === 0,
       );
     }
 

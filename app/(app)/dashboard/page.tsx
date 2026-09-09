@@ -172,7 +172,7 @@ export default async function DashboardPage() {
   if (data.kind === "not_connected") {
     return (
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Oversikt</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Finn avtaler</h1>
         <div className={card + " mt-8"}>
           <p className="text-sm text-ink-secondary">
             Du har ikke koblet til Fiken enda. Koble til for å se leverandørene
@@ -189,7 +189,7 @@ export default async function DashboardPage() {
   if (data.kind === "reauth") {
     return (
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Oversikt</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Finn avtaler</h1>
         <div className={card + " mt-8"}>
           <p className="text-sm text-ink-secondary">
             Tilkoblingen til Fiken har utløpt. Du må fornye tilkoblingen for å se
@@ -206,7 +206,7 @@ export default async function DashboardPage() {
   if (data.kind === "fiken_error") {
     return (
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Oversikt</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Finn avtaler</h1>
         <Alert variant="neutral" className="mt-8">
           Klarte ikke hente data fra Fiken nå. Prøv igjen om litt.
         </Alert>
@@ -217,7 +217,7 @@ export default async function DashboardPage() {
   if (data.kind === "error") {
     return (
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Oversikt</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Finn avtaler</h1>
         <Alert variant="critical" className="mt-8">
           Noe gikk galt da vi hentet dataene dine. Prøv igjen om litt.
         </Alert>
@@ -231,7 +231,7 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold tracking-tight">Oversikt</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Finn avtaler</h1>
       <p className="mt-2 text-sm text-ink-secondary">
         Leverandører fra Fiken, sortert etter hvor sannsynlig det er at de er en
         løpende avtale.

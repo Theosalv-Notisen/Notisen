@@ -9,8 +9,8 @@ import { usePathname } from "next/navigation";
  * <Link>-er.
  */
 const LINKS = [
-  { href: "/dashboard", label: "Oversikt" },
   { href: "/kontrakter", label: "Kontrakter" },
+  { href: "/dashboard", label: "Finn avtaler" },
   { href: "/settings", label: "Innstillinger" },
 ];
 

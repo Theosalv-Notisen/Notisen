@@ -163,9 +163,15 @@ alter table public.contract
   add column if not exists deadline_rolled_at timestamptz;
 
 -- Flere varslingstidspunkt per kontrakt: hvor mange dager før next_deadline
--- Notisen skal sende en påminnelse. NULL = systemstandarden (30 og 7 dager,
+-- Notisen skal sende en påminnelse. NULL = systemstandarden (90, 30 og 7 dager,
 -- se lib/reminder-offsets.ts). Et array (også tomt) = brukerens eksplisitte
 -- valg. `reminder_log(contract_id, offset_days, deadline)` er allerede unik,
 -- så vilkårlige offsets gir automatisk idempotens.
 alter table public.contract
   add column if not exists reminder_offsets integer[];
+
+-- «Avsluttet»-status: brukeren har markert avtalen som ferdig (sagt opp / gått
+-- ut). Arkiverte kontrakter varsles ikke og rulles ikke fram, men beholdes for
+-- historikk. NULL = aktiv.
+alter table public.contract
+  add column if not exists archived_at timestamptz;

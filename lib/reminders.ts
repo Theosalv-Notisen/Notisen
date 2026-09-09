@@ -116,11 +116,14 @@ export async function runReminders(deps: ReminderDeps): Promise<ReminderSummary>
   const today = osloDateString(now);
   const horizon = addDaysIso(today, HORIZON_DAYS);
 
-  // Eksplisitt gate – cron går forbi RLS.
-  const runQuery = (sel: string) =>
-    supabase
+  // Eksplisitt gate – cron går forbi RLS. Bygg spørringen ut fra hvilke
+  // valgfrie kolonner som finnes (migrasjonene kan være kjørt hver for seg):
+  //   withOffsets  → select `reminder_offsets` (per-kontrakt-terskler)
+  //   withArchived → filter bort arkiverte kontrakter
+  const runQuery = (opts: { withOffsets: boolean; withArchived: boolean }) => {
+    let q = supabase
       .from("contract")
-      .select(sel)
+      .select(opts.withOffsets ? `${BASE_SELECT}, reminder_offsets` : BASE_SELECT)
       .eq("status", "confirmed")
       .eq("needs_review", false)
       .not("next_deadline", "is", null)
@@ -128,13 +131,18 @@ export async function runReminders(deps: ReminderDeps): Promise<ReminderSummary>
       .lte("next_deadline", horizon)
       .order("next_deadline", { ascending: true })
       .limit(maxContracts);
+    if (opts.withArchived) q = q.is("archived_at", null);
+    return q;
+  };
 
-  let { data, error } = await runQuery(`${BASE_SELECT}, reminder_offsets`);
-
-  // Bakoverkompatibelt: er `reminder_offsets`-kolonnen ikke migrert inn ennå,
-  // kjør uten den – alle kontrakter faller da tilbake til standardtersklene.
+  let { data, error } = await runQuery({ withOffsets: true, withArchived: true });
+  if (error && /archived_at/.test(error.message)) {
+    // `archived_at` mangler – ingen arkiverte kontrakter finnes uansett.
+    ({ data, error } = await runQuery({ withOffsets: true, withArchived: false }));
+  }
   if (error && /reminder_offsets/.test(error.message)) {
-    ({ data, error } = await runQuery(BASE_SELECT));
+    // `reminder_offsets` mangler også – alle får standardtersklene.
+    ({ data, error } = await runQuery({ withOffsets: false, withArchived: false }));
   }
 
   if (error) {

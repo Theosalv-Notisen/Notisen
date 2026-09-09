@@ -8,12 +8,16 @@ import {
   STATUS_LABEL,
   type ContractStatus,
 } from "@/lib/contract-status";
-import { confirmContract } from "../actions";
+import {
+  archiveContract,
+  confirmContract,
+  unarchiveContract,
+} from "../actions";
 import { ExtractControls } from "./extract-controls";
 import { DeleteButton } from "./delete-button";
 import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { btnPrimary } from "@/components/ui/button-styles";
+import { btnPrimary, btnSecondary } from "@/components/ui/button-styles";
 import { inputClass, labelClass } from "@/components/ui/field";
 import {
   ALLOWED_REMINDER_OFFSETS,
@@ -45,21 +49,29 @@ type ContractDetail = {
 };
 
 /**
- * Leser `reminder_offsets` i et eget, isolert kall. Er kolonnen ikke migrert
- * inn ennå (`add column reminder_offsets integer[]`), svarer PostgREST med en
- * feil – vi svelger den og lar kontrakten falle tilbake på standardtersklene.
+ * Leser de valgfrie kolonnene (`reminder_offsets`, `archived_at`) i et eget,
+ * isolert kall. Er en av dem ikke migrert inn ennå, svarer PostgREST med en
+ * feil – vi prøver progressivt smalere og faller til slutt tilbake på tomt.
  */
-async function readReminderOffsets(
+async function readOptionalFields(
   supabase: Awaited<ReturnType<typeof createClient>>,
   id: string,
-): Promise<number[] | null> {
-  const { data, error } = await supabase
-    .from("contract")
-    .select("reminder_offsets")
-    .eq("id", id)
-    .maybeSingle();
-  if (error) return null;
-  return (data?.reminder_offsets as number[] | null) ?? null;
+): Promise<{ reminderOffsets: number[] | null; archivedAt: string | null }> {
+  for (const sel of ["reminder_offsets, archived_at", "reminder_offsets", ""]) {
+    if (!sel) return { reminderOffsets: null, archivedAt: null };
+    const { data, error } = await supabase
+      .from("contract")
+      .select(sel)
+      .eq("id", id)
+      .maybeSingle();
+    if (error) continue;
+    const row = (data ?? {}) as Record<string, unknown>;
+    return {
+      reminderOffsets: (row.reminder_offsets as number[] | null) ?? null,
+      archivedAt: (row.archived_at as string | null) ?? null,
+    };
+  }
+  return { reminderOffsets: null, archivedAt: null };
 }
 
 type Quote = { field: string; quote: string };
@@ -101,11 +113,14 @@ export default async function KontraktDetaljPage({
     bekreftet?: string;
     uten_frist?: string;
     justert?: string;
-    feil?: "slett" | "bekreft" | string;
+    avsluttet?: string;
+    gjenapnet?: string;
+    feil?: "slett" | "bekreft" | "arkiv" | "arkiv_migrasjon" | string;
   }>;
 }) {
   const { id } = await params;
-  const { bekreftet, uten_frist, justert, feil } = await searchParams;
+  const { bekreftet, uten_frist, justert, avsluttet, gjenapnet, feil } =
+    await searchParams;
   await requireUser(`/kontrakter/${id}`);
 
   const supabase = await createClient();
@@ -127,9 +142,12 @@ export default async function KontraktDetaljPage({
   if (!data) notFound();
 
   const c = data as unknown as ContractDetail;
-  const showForm = c.status === "extracted" || c.status === "confirmed";
+  const { reminderOffsets: storedOffsets, archivedAt } =
+    await readOptionalFields(supabase, id);
+  const isArchived = archivedAt != null;
+  const showForm =
+    !isArchived && (c.status === "extracted" || c.status === "confirmed");
 
-  const storedOffsets = showForm ? await readReminderOffsets(supabase, id) : null;
   const activeOffsets = new Set(effectiveReminderOffsets(storedOffsets));
 
   return (
@@ -163,6 +181,34 @@ export default async function KontraktDetaljPage({
           Åpne PDF{c.original_filename ? ` (${c.original_filename})` : ""}
         </a>
       </p>
+
+      {isArchived ? (
+        <Alert variant="neutral" className="mt-4">
+          Denne avtalen er markert som avsluttet. Den varsles ikke og rulles
+          ikke fram. Gjenåpne den nederst hvis den likevel er aktiv.
+        </Alert>
+      ) : null}
+
+      {avsluttet ? (
+        <Alert variant="neutral" className="mt-4">
+          Avtalen er markert som avsluttet.
+        </Alert>
+      ) : null}
+      {gjenapnet ? (
+        <Alert variant="good" className="mt-4">
+          Avtalen er gjenåpnet. Bekreft feltene for å starte varsling igjen.
+        </Alert>
+      ) : null}
+      {feil === "arkiv_migrasjon" ? (
+        <Alert variant="critical" className="mt-4">
+          «Avsluttet»-funksjonen krever en databaseoppdatering som ikke er kjørt
+          ennå.
+        </Alert>
+      ) : feil === "arkiv" ? (
+        <Alert variant="critical" className="mt-4">
+          Klarte ikke oppdatere avtalen. Prøv igjen om litt.
+        </Alert>
+      ) : null}
 
       {bekreftet && uten_frist ? (
         <Alert variant="warning" className="mt-4">
@@ -400,8 +446,27 @@ export default async function KontraktDetaljPage({
         </>
       ) : null}
 
+      {/* ── Avslutt / gjenåpne ────────────────────────────────────── */}
+      <section className="mt-12 border-t border-border pt-6">
+        <h2 className="text-sm font-semibold">Avslutt avtale</h2>
+        <p className="mt-1 text-xs text-ink-tertiary">
+          {isArchived
+            ? "Avtalen er avsluttet og varsles ikke. Gjenåpne den hvis den likevel gjelder."
+            : "Har du sagt opp avtalen eller er den utgått? Marker den som avsluttet – da beholdes historikken, men du får ingen flere påminnelser."}
+        </p>
+        <form
+          action={isArchived ? unarchiveContract : archiveContract}
+          className="mt-3"
+        >
+          <input type="hidden" name="id" value={c.id} />
+          <button type="submit" className={btnSecondary}>
+            {isArchived ? "Gjenåpne avtalen" : "Marker som avsluttet"}
+          </button>
+        </form>
+      </section>
+
       {/* ── Faresone ──────────────────────────────────────────────── */}
-      <section className="mt-16 border-t border-status-critical/25 pt-6">
+      <section className="mt-12 border-t border-status-critical/25 pt-6">
         <h2 className="text-sm font-semibold text-status-critical">Faresone</h2>
         <p className="mt-1 text-xs text-ink-tertiary">
           Sletting fjerner kontrakten, PDF-en og alle planlagte påminnelser

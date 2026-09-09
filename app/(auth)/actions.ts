@@ -8,25 +8,28 @@ import { createClient } from "@/lib/supabase/server";
  * Ingen klient-JS – skjemaene poster rett hit.
  */
 
+/** Der en innlogget bruker lander uten et eksplisitt `next`. */
+const DEFAULT_LANDING = "/kontrakter";
+
 /**
  * Beskytt mot "open redirect": bare en enkel intern sti godtas.
  * Alt annet (protokoll-relativt `//`, `/\`, kontrolltegn som nettleseren
- * stripper til noe farlig, absolutte URL-er) faller tilbake til /dashboard.
+ * stripper til noe farlig, absolutte URL-er) faller tilbake til DEFAULT_LANDING.
  */
 function safeNext(value: FormDataEntryValue | null): string {
-  if (typeof value !== "string") return "/dashboard";
+  if (typeof value !== "string") return DEFAULT_LANDING;
   // Må starte med én "/" fulgt av noe som ikke er "/" eller "\".
-  if (!/^\/[^/\\]/.test(value)) return "/dashboard";
+  if (!/^\/[^/\\]/.test(value)) return DEFAULT_LANDING;
   for (let i = 0; i < value.length; i++) {
     const c = value.charCodeAt(i);
-    if (c < 0x20 || c === 0x7f) return "/dashboard"; // kontrolltegn
+    if (c < 0x20 || c === 0x7f) return DEFAULT_LANDING; // kontrolltegn
   }
   try {
     const url = new URL(value, "http://localhost");
-    if (url.origin !== "http://localhost") return "/dashboard";
+    if (url.origin !== "http://localhost") return DEFAULT_LANDING;
     return url.pathname + url.search + url.hash;
   } catch {
-    return "/dashboard";
+    return DEFAULT_LANDING;
   }
 }
 

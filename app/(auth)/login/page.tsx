@@ -30,9 +30,9 @@ export default async function LoginPage({
   const { next, feil, slettet, passord_oppdatert } = await searchParams;
   // Allerede innlogget → rett til dashbordet (men behold kvitteringene).
   if (!slettet && !passord_oppdatert && (await getCurrentUser())) {
-    redirect("/dashboard");
+    redirect("/kontrakter");
   }
-  const nextPath = next ?? "/dashboard";
+  const nextPath = next ?? "/kontrakter";
   const error = feil ? (FEIL_TEKST[feil] ?? "Innlogging feilet.") : null;
 
   return (
