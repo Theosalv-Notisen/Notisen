@@ -189,3 +189,34 @@ alter table public.contract alter column storage_path drop not null;
 alter table public.contract
   add column if not exists source text not null default 'fiken'
     check (source in ('fiken', 'manual'));
+
+-- ─────────────────────────────────────────────────────────────
+-- Opprydding i auth.audit_log_entries (GoTrue-innloggingslogg)
+--
+-- Supabase/GoTrue rydder IKKE denne tabellen selv – den vokser uendelig.
+-- Denne funksjonen sletter oppføringer eldre enn `retention_days` (default 90).
+-- Maintenance-cronen (/api/cron/maintenance, lib/contract-maintenance.ts) kaller
+-- den via `supabase.rpc('prune_auth_audit_log')` én gang i døgnet.
+--
+-- SECURITY DEFINER + eier = den som kjører denne fila (postgres) → får slette i
+-- auth-skjemaet. `search_path = ''` hindrer search_path-kapring; alt er
+-- fullkvalifisert. Kun service_role kan kalle den.
+-- ─────────────────────────────────────────────────────────────
+create or replace function public.prune_auth_audit_log(retention_days integer default 90)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  deleted_count integer;
+begin
+  delete from auth.audit_log_entries
+  where created_at < now() - make_interval(days => greatest(retention_days, 1));
+  get diagnostics deleted_count = row_count;
+  return deleted_count;
+end;
+$$;
+
+revoke all on function public.prune_auth_audit_log(integer) from public, anon, authenticated;
+grant execute on function public.prune_auth_audit_log(integer) to service_role;

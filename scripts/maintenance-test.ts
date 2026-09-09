@@ -450,6 +450,19 @@ async function main() {
       `reminderLogsPruned=${summary1.reminderLogsPruned}`,
     );
 
+    // Case 9b – auth.audit_log-opprydding: `authAuditLogsPruned` er alltid et
+    // tall (>= 0), og kjøringen skal ikke ha en feil om denne prunen.
+    const auditErr = summary1.errors.filter((e) =>
+      e.includes("auth.audit_log_entries"),
+    );
+    check(
+      "Case 9b – authAuditLogsPruned er et tall >= 0, ingen prune-feil",
+      typeof summary1.authAuditLogsPruned === "number" &&
+        summary1.authAuditLogsPruned >= 0 &&
+        auditErr.length === 0,
+      `authAuditLogsPruned=${summary1.authAuditLogsPruned}, feil=${JSON.stringify(auditErr)}`,
+    );
+
     // Case 8 (forts.) – ende-til-ende: runReminders sender ett varsel for c8
     const sentReminders: ReminderEmailInput[] = [];
     await runReminders({

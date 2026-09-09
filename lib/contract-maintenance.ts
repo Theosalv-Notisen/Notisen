@@ -41,6 +41,12 @@ const DEADLINE_ROLL_GRACE_DAYS = 14;
 const REMINDER_LOG_RETENTION_DAYS = 400;
 /** Tak på antall frister som rulles fram per kjøring. */
 const MAX_ROLL_FORWARD = 500;
+/**
+ * Oppføringer i `auth.audit_log_entries` (GoTrue-innloggingslogg) eldre enn
+ * dette slettes. Supabase rydder ikke tabellen selv. Slettingen skjer via
+ * SQL-funksjonen `public.prune_auth_audit_log` (se supabase/schema.sql).
+ */
+const AUTH_AUDIT_LOG_RETENTION_DAYS = 90;
 
 /** 'ÅÅÅÅ-MM-DD' `days` dager fra `iso` (kan være negativt). */
 function addDaysIso(iso: string, days: number): string {
@@ -75,6 +81,8 @@ export type MaintenanceSummary = {
   deadlinesClearedForReview: number;
   /** Antall reminder_log-rader slettet fordi fristen ligger langt tilbake. */
   reminderLogsPruned: number;
+  /** Antall auth.audit_log_entries-rader slettet (eldre enn retensjonsgrensen). */
+  authAuditLogsPruned: number;
   /** Menneskelesbare feilmeldinger. */
   errors: string[];
 };
@@ -98,6 +106,7 @@ export async function runMaintenance(
     deadlinesRolled: 0,
     deadlinesClearedForReview: 0,
     reminderLogsPruned: 0,
+    authAuditLogsPruned: 0,
     errors: [],
   };
 
@@ -105,9 +114,36 @@ export async function runMaintenance(
   await deleteAbandonedDrafts(supabase, now, summary);
   await rollForwardDeadlines(deps, summary);
   await cleanupReminderLog(supabase, now, summary);
+  await pruneAuthAuditLog(supabase, summary);
   await logOrphanFiles(supabase, summary);
 
   return summary;
+}
+
+// ── 4b. auth.audit_log_entries-opprydding ────────────────────────────
+/**
+ * Kaller SQL-funksjonen `public.prune_auth_audit_log` (SECURITY DEFINER) som
+ * sletter GoTrue-innloggingslogg eldre enn `AUTH_AUDIT_LOG_RETENTION_DAYS`.
+ * Finnes ikke funksjonen ennå (migrasjonen ikke kjørt) → logg og gå videre.
+ */
+async function pruneAuthAuditLog(
+  supabase: SupabaseClient,
+  summary: MaintenanceSummary,
+) {
+  const { data, error } = await supabase.rpc("prune_auth_audit_log", {
+    retention_days: AUTH_AUDIT_LOG_RETENTION_DAYS,
+  });
+
+  if (error) {
+    // 42883 = function does not exist (migrasjonen ikke kjørt ennå).
+    if (error.code === "PGRST202" || /prune_auth_audit_log/.test(error.message)) {
+      return;
+    }
+    summary.errors.push(`Opprydding av auth.audit_log_entries feilet: ${error.message}`);
+    return;
+  }
+
+  summary.authAuditLogsPruned += typeof data === "number" ? data : 0;
 }
 
 // ── 1. Fastlåste uttrekk ─────────────────────────────────────────────

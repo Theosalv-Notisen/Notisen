@@ -10,6 +10,8 @@ import { runExtraction } from "@/lib/contract-extract-run";
  * Kjøres av Vercel Cron (se vercel.json), én gang i døgnet. Sikkerhetsnett:
  *   - kjører fastlåste uttrekk på nytt
  *   - rydder forlatte drafts (rad + PDF)
+ *   - ruller passerte frister fram + rydder gammel reminder_log
+ *   - rydder auth.audit_log_entries eldre enn 90 dager (via SQL-funksjon)
  *   - logger foreldreløse storage-filer (sletter ikke – ennå)
  *
  * Kjører med service role (admin-klient) og går forbi RLS – all filtrering
