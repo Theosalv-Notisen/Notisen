@@ -1,12 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Logo } from "@/components/brand/logo";
 import { DashboardMockup } from "@/components/marketing/dashboard-mockup";
-import {
-  btnPrimary,
-  btnSecondary,
-  btnSecondarySm,
-} from "@/components/ui/button-styles";
+import { MarketingHeader } from "@/components/marketing/marketing-header";
+import { MarketingFooter } from "@/components/marketing/marketing-footer";
+import { btnPrimary, btnSecondary } from "@/components/ui/button-styles";
 
 export const metadata: Metadata = {
   title: "Notisen – påminnelser om oppsigelsesfrister",
@@ -39,14 +36,7 @@ const STEG = [
 export default function Home() {
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-b border-border">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-          <Logo size="xl" />
-          <Link href="/login" className={btnSecondarySm}>
-            Logg inn
-          </Link>
-        </div>
-      </header>
+      <MarketingHeader />
 
       <main className="flex-1">
         <section className="mx-auto max-w-4xl px-6 pt-16 pb-16 sm:pt-20">
@@ -126,12 +116,7 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="border-t border-border">
-        <div className="mx-auto flex max-w-4xl flex-col gap-3 px-6 py-8 text-sm text-ink-tertiary sm:flex-row sm:items-center sm:justify-between">
-          <Logo size="sm" />
-          <p>Påminnelser om oppsigelsesfrister for bedriftsavtaler.</p>
-        </div>
-      </footer>
+      <MarketingFooter />
     </div>
   );
 }
