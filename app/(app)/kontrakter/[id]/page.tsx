@@ -15,6 +15,7 @@ import {
 } from "../actions";
 import { ExtractControls } from "./extract-controls";
 import { SupplierInsight } from "./supplier-insight";
+import { NegotiationLetter } from "./negotiation-letter";
 import { DeleteButton } from "./delete-button";
 import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -85,6 +86,35 @@ async function readOptionalFields(
     };
   }
   return empty;
+}
+
+/**
+ * Leser brevutkast-kolonnene (`negotiation_draft*`, del 2) i et eget kall.
+ * Er de ikke migrert inn ennå → tomt (komponenten viser bare knappene).
+ */
+async function readNegotiationDraft(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  id: string,
+): Promise<{
+  draft: string | null;
+  kind: "cancellation" | "renegotiation" | null;
+  at: string | null;
+}> {
+  const empty = { draft: null, kind: null, at: null };
+  const { data, error } = await supabase
+    .from("contract")
+    .select("negotiation_draft, negotiation_draft_kind, negotiation_draft_at")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) return empty;
+  const row = (data ?? {}) as Record<string, unknown>;
+  const kind = row.negotiation_draft_kind;
+  return {
+    draft: (row.negotiation_draft as string | null) ?? null,
+    kind:
+      kind === "cancellation" || kind === "renegotiation" ? kind : null,
+    at: (row.negotiation_draft_at as string | null) ?? null,
+  };
 }
 
 type Quote = { field: string; quote: string };
@@ -164,6 +194,10 @@ export default async function KontraktDetaljPage({
   const isManual = source === "manual";
   const showForm =
     !isArchived && (c.status === "extracted" || c.status === "confirmed");
+
+  const letterDraft = showForm
+    ? await readNegotiationDraft(supabase, id)
+    : { draft: null, kind: null, at: null };
 
   const activeOffsets = new Set(effectiveReminderOffsets(storedOffsets));
 
@@ -471,6 +505,16 @@ export default async function KontraktDetaljPage({
 
       {/* ── Innsikt fra Fiken (forhandlingscopilot del 1) ─────────── */}
       {c.status !== "draft" ? <SupplierInsight contractId={c.id} /> : null}
+
+      {/* ── Utkast til brev (forhandlingscopilot del 2) ───────────── */}
+      {showForm ? (
+        <NegotiationLetter
+          contractId={c.id}
+          initialDraft={letterDraft.draft}
+          initialKind={letterDraft.kind}
+          initialAt={letterDraft.at}
+        />
+      ) : null}
 
       {/* ── Avslutt / gjenåpne ────────────────────────────────────── */}
       <section className="mt-12 border-t border-border pt-6">

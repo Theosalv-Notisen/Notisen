@@ -21,6 +21,7 @@
     "contract-category:test": "node scripts/contract-category-test.ts",
     "admin-stats:test": "node scripts/admin-stats-test.ts",
     "supplier-insight:test": "node scripts/supplier-insight-test.ts",
+    "negotiation-letter:test": "node scripts/negotiation-letter-test.ts",
     "rate-limit:test": "node scripts/rate-limit-test.ts",
     "manual-contract:test": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/manual-contract-test.ts",
     "token-crypto:test": "node scripts/token-crypto-test.ts",

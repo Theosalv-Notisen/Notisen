@@ -190,6 +190,15 @@ alter table public.contract
   add column if not exists source text not null default 'fiken'
     check (source in ('fiken', 'manual'));
 
+-- Forhandlingscopilot del 2: utkast til oppsigelses-/reforhandlingsbrev.
+-- Claude-generert, deretter fritt redigerbart av brukeren. Vi sender ingenting –
+-- utkastet kopieres og sendes av brukeren selv. NULL = ikke laget ennå.
+alter table public.contract
+  add column if not exists negotiation_draft       text,
+  add column if not exists negotiation_draft_kind  text
+    check (negotiation_draft_kind in ('cancellation','renegotiation')),
+  add column if not exists negotiation_draft_at    timestamptz;
+
 -- ─────────────────────────────────────────────────────────────
 -- Opprydding i auth.audit_log_entries (GoTrue-innloggingslogg)
 --
