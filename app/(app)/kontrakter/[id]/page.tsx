@@ -363,7 +363,7 @@ export default async function KontraktDetaljPage({
             <fieldset>
               <legend className={labelClass}>Varsle meg før fristen</legend>
               <p className="mt-1 text-xs text-ink-tertiary">
-                Du får én e-post per avkrysset tidspunkt. Standard er 30 og 7
+                Du får én e-post per avkrysset tidspunkt. Standard er 90, 30 og 7
                 dager før.
               </p>
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">

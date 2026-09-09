@@ -10,9 +10,10 @@
 
 /**
  * Standard hvis brukeren ikke har valgt noe selv (`reminder_offsets` er null).
- * Én tidlig heads-up og én siste påminnelse.
+ * Et tidlig varsel (tid til å vurdere/forhandle), en midtveis-påminnelse og en
+ * siste før fristen.
  */
-export const DEFAULT_REMINDER_OFFSETS = [30, 7] as const;
+export const DEFAULT_REMINDER_OFFSETS = [90, 30, 7] as const;
 
 /**
  * Valgene brukeren kan krysse av. `HORIZON_DAYS` i reminders.ts må være

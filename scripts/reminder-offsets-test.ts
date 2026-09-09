@@ -35,7 +35,7 @@ check(
 );
 check(
   "verdier utenfor ALLOWED forkastes (45 finnes ikke)",
-  eq(normalizeReminderOffsets([45, 30, 7]), [30, 7]),
+  eq(normalizeReminderOffsets([45, 90, 30, 7]), [90, 30, 7]),
 );
 check(
   "0, negative og desimaler forkastes",
@@ -54,9 +54,10 @@ check(
 
 // effectiveReminderOffsets
 check(
-  "null → standarden [30, 7]",
+  "null → standarden [90, 30, 7]",
   eq(effectiveReminderOffsets(null), DEFAULT_REMINDER_OFFSETS) &&
-    eq(effectiveReminderOffsets(undefined), DEFAULT_REMINDER_OFFSETS),
+    eq(effectiveReminderOffsets(undefined), DEFAULT_REMINDER_OFFSETS) &&
+    eq(DEFAULT_REMINDER_OFFSETS, [90, 30, 7]),
 );
 check(
   "tomt array respekteres som «ingen varsler»",
