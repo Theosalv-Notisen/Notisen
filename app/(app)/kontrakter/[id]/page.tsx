@@ -14,6 +14,7 @@ import {
   unarchiveContract,
 } from "../actions";
 import { ExtractControls } from "./extract-controls";
+import { SupplierInsight } from "./supplier-insight";
 import { DeleteButton } from "./delete-button";
 import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -467,6 +468,9 @@ export default async function KontraktDetaljPage({
           </form>
         </>
       ) : null}
+
+      {/* ── Innsikt fra Fiken (forhandlingscopilot del 1) ─────────── */}
+      {c.status !== "draft" ? <SupplierInsight contractId={c.id} /> : null}
 
       {/* ── Avslutt / gjenåpne ────────────────────────────────────── */}
       <section className="mt-12 border-t border-border pt-6">
