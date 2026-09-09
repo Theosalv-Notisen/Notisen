@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { unstable_cache } from "next/cache";
+import { after } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { getCurrentUser, requireUser } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { collectBenchmarkSamples } from "@/lib/benchmark-collect";
 import {
   FikenReauthRequiredError,
   getFikenClientForCurrentUser,
@@ -79,6 +82,19 @@ async function loadDashboard(): Promise<DashboardData> {
     const token = await fiken.resolveToken();
 
     const companies = await loadFikenData(user!.id)(token);
+
+    // Del 3: samle inn anonymiserte benchmark-datapunkter etter at siden er
+    // servert. `collectBenchmarkSamples` gjør ingenting uten aktivt samtykke.
+    const analyzedRows = companies.flatMap((c) => c.rows);
+    const userId = user!.id;
+    after(async () => {
+      try {
+        await collectBenchmarkSamples(createAdminClient(), userId, analyzedRows);
+      } catch (err) {
+        console.error("Benchmark-innsamling feilet (ignorert):", err);
+        Sentry.captureException(err, { tags: { area: "benchmark-collect" } });
+      }
+    });
 
     return { kind: "ok", companies };
   } catch (err) {

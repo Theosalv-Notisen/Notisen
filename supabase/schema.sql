@@ -200,6 +200,51 @@ alter table public.contract
   add column if not exists negotiation_draft_at    timestamptz;
 
 -- ─────────────────────────────────────────────────────────────
+-- Forhandlingscopilot del 3: GRUNNLAG for anonymisert prissammenligning.
+--
+-- Bare fundamentet. Ingen aggregering, intet API og ingen UI som viser tall
+-- på tvers av kunder finnes ennå – og skal ikke før minst 5 virksomheter har
+-- samtykket (lib/benchmark.ts, MIN_CONSENTED_BUSINESSES).
+-- ─────────────────────────────────────────────────────────────
+
+-- Opt-in-samtykke per bruker. Aktivt samtykke = rad finnes og withdrawn_at IS NULL.
+create table if not exists public.benchmark_consent (
+  user_id       uuid primary key references auth.users (id) on delete cascade,
+  consented_at  timestamptz not null default now(),
+  withdrawn_at  timestamptz
+);
+
+alter table public.benchmark_consent enable row level security;
+drop policy if exists "egen benchmark_consent" on public.benchmark_consent;
+create policy "egen benchmark_consent" on public.benchmark_consent
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Anonymiserte, kategoriserte pris-datapunkter. `user_id`/`supplier_id` lagres
+-- KUN for å kunne slette en brukers bidrag ved tilbaketrekking/kontosletting.
+-- Pseudonymisert i ro; anonymiseres først i (framtidig) aggregeringslag.
+create table if not exists public.benchmark_sample (
+  id               uuid primary key default gen_random_uuid(),
+  user_id          uuid not null references auth.users (id) on delete cascade,
+  supplier_id      uuid not null references public.supplier (id) on delete cascade,
+  category         text not null,               -- dominant Fiken-konto, ev. 'ukjent'
+  cadence          text,                        -- 'månedlig' | 'årlig' | ...
+  monthly_nok      numeric(12,2) not null,      -- normalisert til pr. måned
+  observed_months  integer not null,
+  span_days        integer not null,
+  sample_month     date not null,               -- øyeblikksbilde-måned (dedup)
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now(),
+  unique (user_id, supplier_id, sample_month)
+);
+
+alter table public.benchmark_sample enable row level security;
+-- Kun eier rører egne rader. Kryss-kunde-aggregering (finnes ikke ennå) skal
+-- utelukkende skje med service_role, som går forbi RLS.
+drop policy if exists "egen benchmark_sample" on public.benchmark_sample;
+create policy "egen benchmark_sample" on public.benchmark_sample
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- ─────────────────────────────────────────────────────────────
 -- Opprydding i auth.audit_log_entries (GoTrue-innloggingslogg)
 --
 -- Supabase/GoTrue rydder IKKE denne tabellen selv – den vokser uendelig.

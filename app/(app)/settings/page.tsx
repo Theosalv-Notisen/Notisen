@@ -1,12 +1,18 @@
 import * as Sentry from "@sentry/nextjs";
 import { requireUser } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 import {
   FikenReauthRequiredError,
   getFikenClientForCurrentUser,
   NoFikenConnectionError,
 } from "@/lib/fiken-connection";
 import { FikenError } from "@/lib/fiken";
+import { hasActiveBenchmarkConsent } from "@/lib/benchmark";
 import { DeleteAccountForm } from "./delete-account-form";
+import {
+  enableBenchmarkConsent,
+  disableBenchmarkConsent,
+} from "./actions";
 import { Alert } from "@/components/ui/alert";
 import { btnPrimary, btnSecondary } from "@/components/ui/button-styles";
 import { card } from "@/components/ui/card";
@@ -71,12 +77,16 @@ export default async function SettingsPage({
     fiken?: string;
     fiken_error?: string;
     slett_feil?: string;
+    benchmark?: string;
   }>;
   // fiken: "connected" | "disconnected" | "disconnect_failed"
+  // benchmark: "pa" | "av" | "migrasjon"
 }) {
   const user = await requireUser("/settings");
-  const { fiken, fiken_error, slett_feil } = await searchParams;
+  const { fiken, fiken_error, slett_feil, benchmark } = await searchParams;
   const status = await loadFikenStatus();
+  const supabase = await createClient();
+  const benchmarkOn = await hasActiveBenchmarkConsent(supabase, user.id);
 
   return (
     <div>
@@ -154,6 +164,49 @@ export default async function SettingsPage({
             <ConnectButton label="Koble til Fiken" />
           </div>
         ) : null}
+      </section>
+
+      {/* ── Anonym prissammenligning (del 3, opt-in) ──────────────── */}
+      <section className={card + " mt-8"}>
+        <h2 className="font-medium">Anonym prissammenligning</h2>
+        {benchmark === "pa" ? (
+          <Alert variant="good" className="mt-3">
+            Takk! Notisen kan nå bruke anonymiserte pristall fra regnskapet ditt
+            til å bygge en sammenligning på tvers av bedrifter.
+          </Alert>
+        ) : null}
+        {benchmark === "av" ? (
+          <Alert variant="neutral" className="mt-3">
+            Avslått. Datapunktene som var samlet inn fra deg er slettet.
+          </Alert>
+        ) : null}
+        {benchmark === "migrasjon" ? (
+          <Alert variant="critical" className="mt-3">
+            Denne funksjonen krever en databaseoppdatering som ikke er kjørt ennå.
+          </Alert>
+        ) : null}
+
+        <p className="mt-3 text-sm text-ink-secondary">
+          Du kan la Notisen bruke <strong>anonymiserte, kategoriserte</strong>{" "}
+          pristall fra regnskapet ditt til å bygge opp en sammenligning på tvers
+          av bedrifter – slik at du senere kan se om andre betaler mindre for
+          liknende tjenester. Ingen leverandørnavn, kontonumre eller beløp som
+          kan spores tilbake til deg blir delt, og sammenligningstall vises ikke
+          til noen før mange nok bedrifter har blitt med. Du kan skru det av når
+          som helst – da slettes det som er samlet inn fra deg.
+        </p>
+        <p className="mt-2 text-sm">
+          Status:{" "}
+          <strong>{benchmarkOn ? "Aktivert" : "Ikke aktivert"}</strong>
+        </p>
+        <form
+          action={benchmarkOn ? disableBenchmarkConsent : enableBenchmarkConsent}
+          className="mt-3"
+        >
+          <button type="submit" className={btnSecondary}>
+            {benchmarkOn ? "Skru av" : "Aktiver"}
+          </button>
+        </form>
       </section>
 
       {/* ── Faresone ──────────────────────────────────────────────── */}

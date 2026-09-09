@@ -10,6 +10,7 @@
  */
 
 import { purchaseTotalNok, type FikenPurchase } from "./fiken.ts";
+import { dominantFikenAccount } from "./supplier-insight.ts";
 
 export type Cadence = { label: string; days: number };
 
@@ -56,6 +57,8 @@ export type SupplierRecurrence = {
   /** true = bør foreslås for kontraktopplasting. */
   isLikelyRecurring: boolean;
   reason: string;
+  /** Mest brukte regnskapskonto for leverandøren (del 3: benchmark-kategori). */
+  dominantAccount: string | null;
 };
 
 function median(xs: number[]): number {
@@ -118,7 +121,10 @@ function buildReason(r: SupplierRecurrence): string {
 export function analyzeRecurring(
   purchases: FikenPurchase[],
 ): SupplierRecurrence[] {
-  const groups = new Map<number, { name: string; points: PurchasePoint[] }>();
+  const groups = new Map<
+    number,
+    { name: string; points: PurchasePoint[]; purchases: FikenPurchase[] }
+  >();
 
   for (const p of purchases) {
     const supplier = p.supplier;
@@ -130,12 +136,14 @@ export function analyzeRecurring(
     const g = groups.get(supplier.contactId) ?? {
       name: supplier.name ?? "Ukjent leverandør",
       points: [],
+      purchases: [],
     };
     g.points.push({
       purchaseId: p.purchaseId,
       date: p.date,
       totalNok,
     });
+    g.purchases.push(p);
     groups.set(supplier.contactId, g);
   }
 
@@ -195,6 +203,7 @@ export function analyzeRecurring(
       confidence,
       isLikelyRecurring: confidence === "high" || confidence === "medium",
       reason: "",
+      dominantAccount: dominantFikenAccount(g.purchases),
     };
     row.reason = buildReason(row);
     results.push(row);

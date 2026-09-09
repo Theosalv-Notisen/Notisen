@@ -1,11 +1,51 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { revalidateTag } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { deleteAccountData } from "@/lib/delete-account";
+import { setBenchmarkConsent } from "@/lib/benchmark";
 import { fikenDataTag } from "@/lib/cache-tags";
+
+/**
+ * Del 3 – opt-in/opt-out for anonym prissammenligning. Ved opt-out slettes
+ * også alle brukerens innsamlede datapunkter (i `setBenchmarkConsent`).
+ */
+async function changeBenchmarkConsent(enabled: boolean) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login?next=/settings");
+
+  try {
+    await setBenchmarkConsent(supabase, user.id, enabled);
+  } catch (err) {
+    // Supabase-feil er et vanlig objekt (ikke Error) – grav ut kode + melding.
+    const e = err as { code?: string; message?: string } | null;
+    const msg = e?.message ?? (err instanceof Error ? err.message : String(err));
+    const missingTable =
+      e?.code === "PGRST205" ||
+      e?.code === "42P01" ||
+      /benchmark_consent|benchmark_sample/.test(msg);
+    if (missingTable) {
+      redirect("/settings?benchmark=migrasjon");
+    }
+    throw err;
+  }
+
+  revalidatePath("/settings");
+  redirect(`/settings?benchmark=${enabled ? "pa" : "av"}`);
+}
+
+export async function enableBenchmarkConsent() {
+  return changeBenchmarkConsent(true);
+}
+
+export async function disableBenchmarkConsent() {
+  return changeBenchmarkConsent(false);
+}
 
 /**
  * Sletter den innloggede brukerens konto permanent: alle PDF-er i storage

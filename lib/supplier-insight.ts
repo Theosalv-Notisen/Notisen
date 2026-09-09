@@ -156,8 +156,11 @@ function dominantAccountOfPurchase(p: FikenPurchase): string | null {
   return best?.account ?? null;
 }
 
-/** Mest brukte konto på tvers av en leverandørs bilag. */
-function dominantAccountOfSupplier(purchases: FikenPurchase[]): string | null {
+/** Mest brukte konto på tvers av en leverandørs bilag. Eksportert – også brukt
+ * av `lib/recurring.ts` for benchmark-kategorisering (del 3). */
+export function dominantFikenAccount(
+  purchases: FikenPurchase[],
+): string | null {
   const counts = new Map<string, number>();
   for (const p of purchases) {
     const a = dominantAccountOfPurchase(p);
@@ -268,7 +271,7 @@ export function computeSupplierInsight(
   );
 
   // ── 2. Kategori + mulig overlapp ──────────────────────────────────
-  const dominantAccount = dominantAccountOfSupplier(targetPurchases);
+  const dominantAccount = dominantFikenAccount(targetPurchases);
   base.dominantAccount = dominantAccount;
   base.dominantCategoryLabel = categoryLabel(dominantAccount);
 
@@ -276,7 +279,7 @@ export function computeSupplierInsight(
     for (const [contactId, g] of bySupplier) {
       if (contactId === targetContactId) continue;
       if (g.purchases.length < MIN_TX_FOR_OVERLAP) continue;
-      if (dominantAccountOfSupplier(g.purchases) !== dominantAccount) continue;
+      if (dominantFikenAccount(g.purchases) !== dominantAccount) continue;
       base.overlaps.push({
         fikenContactId: contactId,
         supplierName: g.name,

@@ -19,6 +19,7 @@ import {
 } from "./fiken-connection.ts";
 import { FikenError } from "./fiken.ts";
 import { loadCompanyPurchases } from "./fiken-cache.ts";
+import type { FikenPurchase } from "./fiken.ts";
 import {
   computeSupplierInsight,
   type SupplierInsight,
@@ -33,7 +34,15 @@ export type InsightUnavailableReason =
   | "fiken_error";
 
 export type InsightLoad =
-  | { available: true; insight: SupplierInsight }
+  | {
+      available: true;
+      insight: SupplierInsight;
+      /**
+       * Selskapets alle kjøp + slug – for del 3 (benchmark-innsamling).
+       * Serialiser ALDRI dette til klienten.
+       */
+      context: { companySlug: string; purchases: FikenPurchase[] };
+    }
   | { available: false; reason: InsightUnavailableReason };
 
 /**
@@ -126,5 +135,9 @@ export async function loadSupplierInsightForContract(
   const insight = computeSupplierInsight(purchases, Number(contactId), today);
   if (insight.noData) return { available: false, reason: "no_data" };
 
-  return { available: true, insight };
+  return {
+    available: true,
+    insight,
+    context: { companySlug: slug, purchases },
+  };
 }

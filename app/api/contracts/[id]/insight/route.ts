@@ -1,19 +1,20 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth";
 import { loadSupplierInsightForContract } from "@/lib/supplier-insight-load";
+import { analyzeRecurring } from "@/lib/recurring";
+import { collectBenchmarkSamples } from "@/lib/benchmark-collect";
 
 /**
  * GET /api/contracts/[id]/insight
  *
- * Del 1 av forhandlingscopiloten: regner ut prisutvikling, mulig overlapp og
- * årlig forbruk for kontraktens leverandør – utelukkende fra brukerens egne
- * Fiken-tall.
+ * Del 1: prisutvikling, mulig overlapp og årlig forbruk for kontraktens
+ * leverandør – kun fra brukerens egne Fiken-tall.
  *
- * Klientkomponenten `<SupplierInsight>` henter dette etter at siden er lastet,
- * så en manglende/treg Fiken-kobling aldri blokkerer kontraktsdetaljsiden.
- * Svar: `{ available: true, insight }` eller `{ available: false, reason }`.
+ * Del 3 (bakgrunn): når innsikten er hentet OG brukeren har samtykket, samles
+ * anonymiserte, kategoriserte datapunkter inn via `after()` (etter svaret).
  */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,7 +39,25 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(result);
+    if (!result.available) {
+      return NextResponse.json(result);
+    }
+
+    // Del 3: benchmark-innsamling etter svaret. `collectBenchmarkSamples` gjør
+    // ingenting uten aktivt samtykke.
+    const purchases = result.context.purchases;
+    const userId = user.id;
+    after(async () => {
+      try {
+        const rows = analyzeRecurring(purchases);
+        await collectBenchmarkSamples(createAdminClient(), userId, rows);
+      } catch (err) {
+        console.error("Benchmark-innsamling feilet (ignorert):", err);
+        Sentry.captureException(err, { tags: { area: "benchmark-collect" } });
+      }
+    });
+
+    return NextResponse.json({ available: true, insight: result.insight });
   } catch (err) {
     console.error("Innsikt-henting feilet:", err);
     Sentry.captureException(err, { tags: { area: "supplier-insight" } });
