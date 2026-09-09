@@ -82,8 +82,8 @@ export async function sendReminderEmail(input: ReminderEmailInput): Promise<void
  * Farge (inline hex) for statusboksen rundt frist-setningen, ut fra hvor
  * mange dager det er igjen.
  *
- * Terskler holdes i synk med `deadlineStatus` i `lib/deadline-status.ts` og
- * med `OFFSETS = [90, 60, 30]` i `lib/reminders.ts`. Endrer du én, endre alle.
+ * Ren visnings-farge – hold den i synk med `deadlineStatus` i
+ * `lib/deadline-status.ts` (uavhengig av varslingstidspunktene per kontrakt).
  */
 function statusColorForDays(daysLeft: number): {
   text: string;

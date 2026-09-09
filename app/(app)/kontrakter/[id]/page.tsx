@@ -15,6 +15,10 @@ import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { btnPrimary } from "@/components/ui/button-styles";
 import { inputClass, labelClass } from "@/components/ui/field";
+import {
+  ALLOWED_REMINDER_OFFSETS,
+  effectiveReminderOffsets,
+} from "@/lib/reminder-offsets";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +43,24 @@ type ContractDetail = {
   llm_raw: unknown;
   supplier: { name: string; organization_number: string | null } | null;
 };
+
+/**
+ * Leser `reminder_offsets` i et eget, isolert kall. Er kolonnen ikke migrert
+ * inn ennå (`add column reminder_offsets integer[]`), svarer PostgREST med en
+ * feil – vi svelger den og lar kontrakten falle tilbake på standardtersklene.
+ */
+async function readReminderOffsets(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  id: string,
+): Promise<number[] | null> {
+  const { data, error } = await supabase
+    .from("contract")
+    .select("reminder_offsets")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) return null;
+  return (data?.reminder_offsets as number[] | null) ?? null;
+}
 
 type Quote = { field: string; quote: string };
 
@@ -106,6 +128,9 @@ export default async function KontraktDetaljPage({
 
   const c = data as unknown as ContractDetail;
   const showForm = c.status === "extracted" || c.status === "confirmed";
+
+  const storedOffsets = showForm ? await readReminderOffsets(supabase, id) : null;
+  const activeOffsets = new Set(effectiveReminderOffsets(storedOffsets));
 
   return (
     <div>
@@ -334,6 +359,33 @@ export default async function KontraktDetaljPage({
               </label>
               <Belegg quotes={quotesFor(c.llm_raw, "auto_renews")} />
             </div>
+
+            <fieldset>
+              <legend className={labelClass}>Varsle meg før fristen</legend>
+              <p className="mt-1 text-xs text-ink-tertiary">
+                Du får én e-post per avkrysset tidspunkt. Standard er 30 og 7
+                dager før.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
+                {ALLOWED_REMINDER_OFFSETS.map((days) => (
+                  <label
+                    key={days}
+                    className="flex items-center gap-1.5 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      name="reminder_offsets"
+                      value={days}
+                      defaultChecked={activeOffsets.has(days)}
+                      className="accent-accent"
+                    />
+                    <span className="tabular-nums">
+                      {days} {days === 1 ? "dag" : "dager"}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
 
             <button type="submit" className={btnPrimary}>
               {c.status === "confirmed"

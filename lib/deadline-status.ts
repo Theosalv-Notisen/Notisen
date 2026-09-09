@@ -5,8 +5,10 @@
  * Ren logikk – ingen `server-only`/`next`-import, trygg i både server- og
  * klientkomponenter.
  *
- * Terskler holdes i synk med `OFFSETS = [90, 60, 30]` i `lib/reminders.ts`
- * og med `statusColorForDays` i `lib/email.ts`. Endrer du én, endre alle.
+ * Dette er en REN VISNINGS-terskel (farge i lista/detaljsiden) – uavhengig av
+ * når e-postvarslene faktisk sendes (det styres per kontrakt, se
+ * `lib/reminder-offsets.ts`). Hold den i synk med `statusColorForDays` i
+ * `lib/email.ts` så fargen i appen og fargen i e-posten stemmer.
  */
 
 import { daysUntil } from "./contract-status.ts";

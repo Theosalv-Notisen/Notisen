@@ -70,7 +70,18 @@ type SeededContract = {
   status: string;
   needsReview: boolean;
   deadline: string | null;
+  /** undefined = ikke sett kolonnen; null = eksplisitt null; array = valgt sett. */
+  reminderOffsets?: number[] | null;
 };
+
+/** Finnes `reminder_offsets`-kolonnen? (Migrasjonen kjørt?) */
+async function reminderOffsetsColumnExists(): Promise<boolean> {
+  const { error } = await admin
+    .from("contract")
+    .select("reminder_offsets")
+    .limit(1);
+  return !error;
+}
 
 async function main() {
   const nonce = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -97,27 +108,70 @@ async function main() {
       throw new Error(`Klarte ikke lage supplier: ${supplierErr?.message}`);
     }
 
+    const hasOffsetsColumn = await reminderOffsetsColumnExists();
+    check(
+      hasOffsetsColumn
+        ? "reminder_offsets-kolonnen finnes – kjører per-kontrakt-tersklene også"
+        : "reminder_offsets-kolonnen mangler – hopper over per-kontrakt-cases (kjør migrasjonen)",
+      true,
+    );
+
+    // Standardtersklene er nå [30, 7] (lib/reminder-offsets.ts). Basiscasene
+    // under bruker den standarden; per-kontrakt-casene krever kolonnen.
     const seeds: SeededContract[] = [
-      { key: "c1", status: "confirmed", needsReview: false, deadline: plusDays(90) },
-      { key: "c3", status: "confirmed", needsReview: true, deadline: plusDays(60) },
-      { key: "c4", status: "extracted", needsReview: false, deadline: plusDays(30) },
-      { key: "c5", status: "confirmed", needsReview: false, deadline: plusDays(45) },
+      { key: "c1", status: "confirmed", needsReview: false, deadline: plusDays(30) },
+      { key: "c3", status: "confirmed", needsReview: true, deadline: plusDays(7) },
+      { key: "c4", status: "extracted", needsReview: false, deadline: plusDays(7) },
+      { key: "c5", status: "confirmed", needsReview: false, deadline: plusDays(5) },
       { key: "c6", status: "confirmed", needsReview: false, deadline: plusDays(-5) },
       { key: "c7", status: "confirmed", needsReview: false, deadline: plusDays(30) },
     ];
+    if (hasOffsetsColumn) {
+      seeds.push(
+        // Egendefinert sett: 55 dager igjen → treffer 60 (fra [60,14]), mens
+        // standarden [30,7] ikke ville sendt noe ennå.
+        {
+          key: "cCustom",
+          status: "confirmed",
+          needsReview: false,
+          deadline: plusDays(55),
+          reminderOffsets: [60, 14],
+        },
+        // Eksplisitt tomt array = «ingen varsler», selv med frist nær.
+        {
+          key: "cEmpty",
+          status: "confirmed",
+          needsReview: false,
+          deadline: plusDays(3),
+          reminderOffsets: [],
+        },
+        // Eksplisitt null = bruk standarden [30,7].
+        {
+          key: "cNull",
+          status: "confirmed",
+          needsReview: false,
+          deadline: plusDays(3),
+          reminderOffsets: null,
+        },
+      );
+    }
 
     for (const seed of seeds) {
+      const insert: Record<string, unknown> = {
+        user_id: userId,
+        supplier_id: supplier.id,
+        storage_path: `test/${nonce}-${seed.key}.pdf`,
+        original_filename: `${seed.key}.pdf`,
+        status: seed.status,
+        needs_review: seed.needsReview,
+        next_deadline: seed.deadline,
+      };
+      if (seed.reminderOffsets !== undefined) {
+        insert.reminder_offsets = seed.reminderOffsets;
+      }
       const { data: row, error: rowErr } = await admin
         .from("contract")
-        .insert({
-          user_id: userId,
-          supplier_id: supplier.id,
-          storage_path: `test/${nonce}-${seed.key}.pdf`,
-          original_filename: `${seed.key}.pdf`,
-          status: seed.status,
-          needs_review: seed.needsReview,
-          next_deadline: seed.deadline,
-        })
+        .insert(insert)
         .select("id")
         .single();
       if (rowErr || !row) {
@@ -158,7 +212,7 @@ async function main() {
         original_filename: "c8.pdf",
         status: "confirmed",
         needs_review: false,
-        next_deadline: plusDays(80),
+        next_deadline: plusDays(20),
       })
       .select("id")
       .single();
@@ -212,7 +266,9 @@ async function main() {
     const emailsFor = (arr: ReminderEmailInput[], k: string) =>
       arr.filter((e) => e.contractId === id(k));
 
-    // Case 1: confirmed, needs_review=false, frist i dag+90
+    // Standardterskler = [30, 7].
+
+    // Case 1: confirmed, needs_review=false, frist i dag+30 → 1 e-post offset=30
     const c1Mails = emailsFor(sent1, "c1");
     check(
       "Case 1 – 1 e-post for c1 med riktig mottaker",
@@ -220,8 +276,8 @@ async function main() {
       `fikk ${c1Mails.length} e-post(er), to=${c1Mails[0]?.to}`,
     );
     check(
-      "Case 1 – reminder_log offset=90 for c1",
-      JSON.stringify(await logRows(id("c1"))) === JSON.stringify([90]),
+      "Case 1 – reminder_log offset=30 for c1",
+      JSON.stringify(await logRows(id("c1"))) === JSON.stringify([30]),
       `logg = ${JSON.stringify(await logRows(id("c1")))}`,
     );
 
@@ -247,16 +303,16 @@ async function main() {
       (await logRows(id("c4"))).length === 0,
     );
 
-    // Case 5: confirmed, frist i dag+45 → 1 e-post offset=60 + stille offset=90
+    // Case 5: confirmed, frist i dag+5 → 1 e-post offset=7 + stille backfill offset=30
     const c5Mails = emailsFor(sent1, "c5");
     check(
-      "Case 5 – 1 e-post for c5",
+      "Case 5 – 1 e-post for c5 (den mest akutte terskelen)",
       c5Mails.length === 1,
       `fikk ${c5Mails.length}`,
     );
     check(
-      "Case 5 – reminder_log har offset 60 og 90 for c5",
-      JSON.stringify(await logRows(id("c5"))) === JSON.stringify([60, 90]),
+      "Case 5 – reminder_log har offset 7 og 30 for c5",
+      JSON.stringify(await logRows(id("c5"))) === JSON.stringify([7, 30]),
       `logg = ${JSON.stringify(await logRows(id("c5")))}`,
     );
 
@@ -278,8 +334,8 @@ async function main() {
       `failed = ${summary1.failed}`,
     );
     check(
-      "Case 7 – reminder_log for c7 har backfill 60 og 90, men IKKE 30",
-      JSON.stringify(await logRows(id("c7"))) === JSON.stringify([60, 90]),
+      "Case 7 – ingen reminder_log for c7 (sendingen feilet, logg-raden rullet tilbake)",
+      (await logRows(id("c7"))).length === 0,
       `logg = ${JSON.stringify(await logRows(id("c7")))}`,
     );
 
@@ -295,6 +351,46 @@ async function main() {
       emailsFor(sent1, "c1").length === 1 && emailsFor(sent1, "c5").length === 1,
       `c1=${emailsFor(sent1, "c1").length}, c5=${emailsFor(sent1, "c5").length}`,
     );
+
+    // ── Per-kontrakt varslingstidspunkt (krever reminder_offsets-kolonnen) ──
+    if (hasOffsetsColumn) {
+      // cCustom: [60,14], frist +55 → treffer 60. Standarden [30,7] ville ikke
+      // sendt noe ennå ved +55.
+      const cCustomMails = emailsFor(sent1, "cCustom");
+      check(
+        "Per-kontrakt – cCustom ([60,14], +55) sender 1 e-post (standarden ville ikke)",
+        cCustomMails.length === 1,
+        `fikk ${cCustomMails.length}`,
+      );
+      check(
+        "Per-kontrakt – cCustom reminder_log = [60]",
+        JSON.stringify(await logRows(id("cCustom"))) === JSON.stringify([60]),
+        `logg = ${JSON.stringify(await logRows(id("cCustom")))}`,
+      );
+
+      // cEmpty: [] = ingen varsler, selv med frist +3.
+      check(
+        "Per-kontrakt – cEmpty ([], +3) sender 0 e-poster",
+        emailsFor(sent1, "cEmpty").length === 0,
+        `fikk ${emailsFor(sent1, "cEmpty").length}`,
+      );
+      check(
+        "Per-kontrakt – cEmpty ingen reminder_log",
+        (await logRows(id("cEmpty"))).length === 0,
+      );
+
+      // cNull: eksplisitt null → standarden [30,7]. Frist +3 → sender offset 7.
+      check(
+        "Per-kontrakt – cNull (null, +3) bruker standarden og sender 1 e-post",
+        emailsFor(sent1, "cNull").length === 1,
+        `fikk ${emailsFor(sent1, "cNull").length}`,
+      );
+      check(
+        "Per-kontrakt – cNull reminder_log = [7, 30]",
+        JSON.stringify(await logRows(id("cNull"))) === JSON.stringify([7, 30]),
+        `logg = ${JSON.stringify(await logRows(id("cNull")))}`,
+      );
+    }
 
     // Case 8: confirmed-kontrakt uten supplier-rad
     if (c8Survived) {
@@ -347,7 +443,7 @@ async function main() {
     check(
       "Kjøring 2 – c7 får nå sitt varsel (self-healing), offset=30",
       emailsFor(sent2, "c7").length === 1 &&
-        JSON.stringify(await logRows(id("c7"))) === JSON.stringify([30, 60, 90]),
+        JSON.stringify(await logRows(id("c7"))) === JSON.stringify([30]),
       `e-poster=${emailsFor(sent2, "c7").length}, logg=${JSON.stringify(
         await logRows(id("c7")),
       )}`,

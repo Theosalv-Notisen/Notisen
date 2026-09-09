@@ -17,6 +17,7 @@
     "delete-account:test": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/delete-account-test.ts",
     "deadline:test": "node scripts/deadline-test.ts",
     "deadline-status:test": "node scripts/deadline-status-test.ts",
+    "reminder-offsets:test": "node scripts/reminder-offsets-test.ts",
     "token-crypto:test": "node scripts/token-crypto-test.ts",
     "fiken-token-encryption:test": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/fiken-token-encryption-test.ts",
     "encrypt-tokens:migrate": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/encrypt-fiken-tokens.ts"

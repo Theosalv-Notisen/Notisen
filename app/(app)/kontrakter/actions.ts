@@ -15,6 +15,7 @@ import {
   NOTICE_PERIOD_DAYS_RANGE,
   TERM_MONTHS_RANGE,
 } from "@/lib/contract-fields";
+import { normalizeReminderOffsets } from "@/lib/reminder-offsets";
 
 /**
  * Server actions for kontrakt-detaljsiden.
@@ -90,34 +91,56 @@ export async function confirmContract(formData: FormData) {
     notice_period_days: norm.notice_period_days.value,
   };
 
+  // Varslingstidspunkt: avkryssingsboksene «reminder_offsets». Tomt utvalg →
+  // null (systemstandarden 30/7 gjelder). Alt annet lagres som brukerens valg.
+  const chosenOffsets = normalizeReminderOffsets(
+    formData.getAll("reminder_offsets"),
+  );
+  const reminderOffsets = chosenOffsets.length > 0 ? chosenOffsets : null;
+
   const deadline = computeNextDeadline(deadlineFieldsFromRow(fields), today);
+
+  const patch: Record<string, unknown> = {
+    ...fields,
+    reminder_offsets: reminderOffsets,
+    next_deadline: deadline.date,
+    // Brukeren har nå sett på feltene selv – nullstill roll-forward-markøren
+    // så «frist rullet automatisk»-notisen forsvinner.
+    deadline_rolled_at: null,
+    // Uten en beregnet frist er kontrakten reelt umonitorert – behold
+    // needs_review slik at varsel-cronen (som krever needs_review = false)
+    // ikke plukker den opp, og si det tydelig til brukeren under.
+    needs_review: deadline.date === null,
+    status: "confirmed",
+    updated_at: new Date().toISOString(),
+  };
 
   // `.select(...).maybeSingle()` gjør at vi ser om en rad faktisk ble oppdatert.
   // Bekrefter man en id som ikke finnes / ikke er sin egen → 0 rader, og da skal
   // brukeren IKKE få en falsk "bekreftet"-kvittering (samme mønster som
   // deleteContractById). Da sender vi tilbake til detaljsiden med ?feil=bekreft.
-  const { data: updated, error } = await supabase
-    .from("contract")
-    .update({
-      ...fields,
-      next_deadline: deadline.date,
-      // Brukeren har nå sett på feltene selv – nullstill roll-forward-markøren
-      // så «frist rullet automatisk»-notisen forsvinner.
-      deadline_rolled_at: null,
-      // Uten en beregnet frist er kontrakten reelt umonitorert – behold
-      // needs_review slik at varsel-cronen (som krever needs_review = false)
-      // ikke plukker den opp, og si det tydelig til brukeren under.
-      needs_review: deadline.date === null,
-      status: "confirmed",
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id)
-    .eq("user_id", user.id)
-    // Statusvern: en tilpasset POST skal ikke kunne tvinge en
-    // draft/processing/failed-kontrakt rett til 'confirmed'.
-    .in("status", ["extracted", "confirmed"])
-    .select("id")
-    .maybeSingle();
+  async function saveConfirmed(body: Record<string, unknown>) {
+    return supabase
+      .from("contract")
+      .update(body)
+      .eq("id", id)
+      .eq("user_id", user!.id)
+      // Statusvern: en tilpasset POST skal ikke kunne tvinge en
+      // draft/processing/failed-kontrakt rett til 'confirmed'.
+      .in("status", ["extracted", "confirmed"])
+      .select("id")
+      .maybeSingle();
+  }
+
+  let { data: updated, error } = await saveConfirmed(patch);
+
+  // Bakoverkompatibelt: er `reminder_offsets`-kolonnen ikke migrert inn ennå,
+  // lagre resten uten den (kontrakten får standardtersklene så lenge).
+  if (error && /reminder_offsets/.test(error.message)) {
+    const { reminder_offsets: _omit, ...rest } = patch;
+    void _omit;
+    ({ data: updated, error } = await saveConfirmed(rest));
+  }
 
   if (error) throw error;
   if (!updated) redirect(`/kontrakter/${id}?feil=bekreft`);

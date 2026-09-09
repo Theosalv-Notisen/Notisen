@@ -192,7 +192,9 @@ async function main() {
         next_deadline: plusDays(200),
         fields: rollsForward,
       },
-      // 8: bindingstid rett fram i tid, 0 dagers frist → ruller til bindingsdato
+      // 8: bindingstid rett fram i tid, 0 dagers frist → ruller til bindingsdato.
+      //    20 dager fram: innenfor standardvinduet [30, 7] så ende-til-ende-
+      //    sjekken av runReminders lenger nede sender ett varsel.
       {
         key: "c8",
         status: "confirmed",
@@ -200,7 +202,7 @@ async function main() {
         next_deadline: plusDays(-40),
         fields: dl({
           auto_renews: true,
-          binding_until: plusDays(45),
+          binding_until: plusDays(20),
           notice_period_days: 0,
         }),
       },
@@ -387,9 +389,9 @@ async function main() {
     // Case 8 – roll-forward gir bindingsdatoen
     const c8 = await getContract("c8");
     check(
-      "Case 8 – c8.next_deadline == bindingstidens utløp (plusDays(45))",
-      c8.next_deadline === plusDays(45),
-      `next_deadline=${c8.next_deadline}, forventet ${plusDays(45)}`,
+      "Case 8 – c8.next_deadline == bindingstidens utløp (plusDays(20))",
+      c8.next_deadline === plusDays(20),
+      `next_deadline=${c8.next_deadline}, forventet ${plusDays(20)}`,
     );
     check("Case 8 – c8.needs_review forblir false", c8.needs_review === false);
 

@@ -161,3 +161,11 @@ alter table public.supplier
 -- Eksisterende contract_next_deadline_idx dekker spørringen – ingen ny index.
 alter table public.contract
   add column if not exists deadline_rolled_at timestamptz;
+
+-- Flere varslingstidspunkt per kontrakt: hvor mange dager før next_deadline
+-- Notisen skal sende en påminnelse. NULL = systemstandarden (30 og 7 dager,
+-- se lib/reminder-offsets.ts). Et array (også tomt) = brukerens eksplisitte
+-- valg. `reminder_log(contract_id, offset_days, deadline)` er allerede unik,
+-- så vilkårlige offsets gir automatisk idempotens.
+alter table public.contract
+  add column if not exists reminder_offsets integer[];

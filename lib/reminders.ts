@@ -12,11 +12,16 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  ALLOWED_REMINDER_OFFSETS,
+  effectiveReminderOffsets,
+} from "./reminder-offsets.ts";
 
-/** Varsel-terskler i dager før fristen. */
-const OFFSETS = [90, 60, 30] as const;
-/** Hvor langt fram vi ser etter frister (lengste offset). */
-const HORIZON_DAYS = 90;
+/**
+ * Hvor langt fram vi ser etter frister. Må dekke det største valgbare
+ * varslingstidspunktet, ellers hentes ikke kontrakten tidlig nok.
+ */
+const HORIZON_DAYS = Math.max(...ALLOWED_REMINDER_OFFSETS);
 /** Postgres-kode for brudd på unique-constraint. */
 const UNIQUE_VIOLATION = "23505";
 
@@ -57,8 +62,12 @@ type ContractRow = {
   id: string;
   user_id: string;
   next_deadline: string;
+  /** Brukerens valgte varslingsdager, eller null → systemstandard. */
+  reminder_offsets: number[] | null;
   supplier: { name: string | null } | { name: string | null }[] | null;
 };
+
+const BASE_SELECT = "id, user_id, next_deadline, supplier:supplier_id (name)";
 
 /** 'ÅÅÅÅ-MM-DD' for en gitt dato i Europe/Oslo. */
 function osloDateString(now: Date): string {
@@ -108,22 +117,38 @@ export async function runReminders(deps: ReminderDeps): Promise<ReminderSummary>
   const horizon = addDaysIso(today, HORIZON_DAYS);
 
   // Eksplisitt gate – cron går forbi RLS.
-  const { data, error } = await supabase
-    .from("contract")
-    .select("id, user_id, next_deadline, supplier:supplier_id (name)")
-    .eq("status", "confirmed")
-    .eq("needs_review", false)
-    .not("next_deadline", "is", null)
-    .gte("next_deadline", today)
-    .lte("next_deadline", horizon)
-    .order("next_deadline", { ascending: true })
-    .limit(maxContracts);
+  const runQuery = (sel: string) =>
+    supabase
+      .from("contract")
+      .select(sel)
+      .eq("status", "confirmed")
+      .eq("needs_review", false)
+      .not("next_deadline", "is", null)
+      .gte("next_deadline", today)
+      .lte("next_deadline", horizon)
+      .order("next_deadline", { ascending: true })
+      .limit(maxContracts);
+
+  let { data, error } = await runQuery(`${BASE_SELECT}, reminder_offsets`);
+
+  // Bakoverkompatibelt: er `reminder_offsets`-kolonnen ikke migrert inn ennå,
+  // kjør uten den – alle kontrakter faller da tilbake til standardtersklene.
+  if (error && /reminder_offsets/.test(error.message)) {
+    ({ data, error } = await runQuery(BASE_SELECT));
+  }
 
   if (error) {
     throw new Error(`Klarte ikke hente kontrakter: ${error.message}`);
   }
 
-  const rows = (data ?? []) as ContractRow[];
+  // `data` fra et dynamisk `.select(string)` er svakt typet – normaliser her:
+  // hver rad får `reminder_offsets: null` som default hvis feltet mangler
+  // (fallback-spørringen uten kolonnen).
+  const raw = (data ?? []) as unknown as Array<Record<string, unknown>>;
+  const rows: ContractRow[] = raw.map((r) => ({
+    reminder_offsets: null,
+    ...r,
+  })) as ContractRow[];
   const emailCache = new Map<string, string | null>();
 
   async function resolveEmail(userId: string): Promise<string | null> {
@@ -139,10 +164,13 @@ export async function runReminders(deps: ReminderDeps): Promise<ReminderSummary>
       const deadline = row.next_deadline;
       const daysLeft = dateDiffDays(deadline, today);
 
+      // Brukerens valgte varslingsdager for denne kontrakten (eller standarden).
+      const offsets = effectiveReminderOffsets(row.reminder_offsets);
+
       // Terskel-logikk: alle offsets vi har passert, ikke bare den eksakte dagen.
       // (Vercel-cron kan hoppe over en kjøring – eksakt dag-match ville mistet
       // varselet permanent.)
-      const applicable = OFFSETS.filter((o) => daysLeft <= o);
+      const applicable = offsets.filter((o) => daysLeft <= o);
       if (applicable.length === 0) continue;
       const mostUrgent = Math.min(...applicable);
 
