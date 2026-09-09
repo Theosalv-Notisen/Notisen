@@ -26,13 +26,22 @@ type ContractRow = {
   deadline_rolled_at: string | null;
   needs_review: boolean;
   archived_at: string | null;
+  source: string;
+  storage_path: string | null;
   original_filename: string | null;
   created_at: string;
   supplier: { name: string } | null;
 };
 
 const BASE_SELECT =
-  "id, status, next_deadline, deadline_rolled_at, needs_review, original_filename, created_at, supplier:supplier_id (name)";
+  "id, status, next_deadline, deadline_rolled_at, needs_review, storage_path, original_filename, created_at, supplier:supplier_id (name)";
+
+/** Progressivt smalere select-er – valgfrie kolonner kan mangle før migrasjon. */
+const SELECTS = [
+  `${BASE_SELECT}, archived_at, source`,
+  `${BASE_SELECT}, archived_at`,
+  BASE_SELECT,
+];
 
 const PILL_CLASS: Record<ContractCategory, string> = {
   aktiv: "bg-status-good-tint text-status-good",
@@ -70,16 +79,18 @@ export default async function KontrakterPage({
       .neq("status", "draft")
       .order("created_at", { ascending: false });
 
-  let res = await fetchContracts(`${BASE_SELECT}, archived_at`);
-  // Bakoverkompatibelt: er `archived_at` ikke migrert inn ennå, kjør uten den.
-  if (res.error && /archived_at/.test(res.error.message)) {
-    res = await fetchContracts(BASE_SELECT);
+  let res = await fetchContracts(SELECTS[0]);
+  for (let i = 1; i < SELECTS.length && res.error; i++) {
+    if (!/archived_at|source/.test(res.error.message)) break;
+    res = await fetchContracts(SELECTS[i]);
   }
   const { error } = res;
 
   const raw = (res.data ?? []) as unknown as Array<Record<string, unknown>>;
   const contracts: ContractRow[] = raw.map((r) => ({
     archived_at: null,
+    source: "fiken",
+    storage_path: null,
     ...r,
   })) as ContractRow[];
 
@@ -107,11 +118,21 @@ export default async function KontrakterPage({
 
   return (
     <div>
-      <h1 className="text-2xl font-bold tracking-tight">Kontrakter</h1>
-      <p className="mt-2 text-sm text-ink-secondary">
-        Alle avtalene dine, sortert etter hvor nær oppsigelsesfristen er. Du
-        bekrefter selv en kontrakt før den overvåkes.
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Kontrakter</h1>
+          <p className="mt-2 max-w-xl text-sm text-ink-secondary">
+            Alle avtalene dine, sortert etter hvor nær oppsigelsesfristen er. Du
+            bekrefter selv en kontrakt før den overvåkes.
+          </p>
+        </div>
+        <Link
+          href="/kontrakter/ny"
+          className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-accent-tint"
+        >
+          + Ny kontrakt
+        </Link>
+      </div>
 
       {error ? (
         <Alert variant="critical" className="mt-8">
@@ -196,8 +217,14 @@ export default async function KontrakterPage({
                       ) : null}
                     </div>
                     <div>
-                      <dt className="text-ink-tertiary">Fil</dt>
-                      <dd className="truncate">{c.original_filename ?? "–"}</dd>
+                      <dt className="text-ink-tertiary">Kilde</dt>
+                      <dd className="truncate">
+                        {c.source === "manual"
+                          ? c.original_filename
+                            ? `Manuelt · ${c.original_filename}`
+                            : "Lagt til manuelt"
+                          : (c.original_filename ?? "Fra Fiken")}
+                      </dd>
                     </div>
                     <div>
                       <dt className="text-ink-tertiary">Status</dt>

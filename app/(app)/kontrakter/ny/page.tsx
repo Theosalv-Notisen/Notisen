@@ -7,6 +7,7 @@ import {
 } from "@/lib/fiken-connection";
 import { FikenError, type FikenContact } from "@/lib/fiken";
 import { UploadForm } from "./upload-form";
+import { ManualForm } from "./manual-form";
 import { Alert } from "@/components/ui/alert";
 
 export const dynamic = "force-dynamic";
@@ -53,17 +54,26 @@ export default async function NyKontraktPage({
   const { company, contact } = await searchParams;
   const contactId = Number(contact);
 
+  // Uten Fiken-leverandør i URL-en → manuell registrering.
   if (!company || !contact || !Number.isFinite(contactId)) {
     return (
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Last opp kontrakt</h1>
-        <Melding>
-          Mangler informasjon om hvilken leverandør kontrakten gjelder. Gå til{" "}
+        <Link
+          href="/kontrakter"
+          className="text-sm text-ink-secondary hover:text-ink"
+        >
+          ← Alle kontrakter
+        </Link>
+        <h1 className="mt-2 text-2xl font-bold tracking-tight">Ny kontrakt</h1>
+        <p className="mt-2 text-sm text-ink-secondary">
+          Legg til en avtale som ikke går via Fiken, eller som Notisen ikke har
+          fanget opp. Har du en Fiken-leverandør, gå heller til{" "}
           <Link href="/dashboard" className="text-accent underline">
             Finn avtaler
-          </Link>{" "}
-          og velg «Last opp kontrakt» på en leverandør.
-        </Melding>
+          </Link>
+          .
+        </p>
+        <ManualForm />
       </div>
     );
   }

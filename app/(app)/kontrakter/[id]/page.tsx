@@ -30,6 +30,7 @@ type ContractDetail = {
   id: string;
   status: ContractStatus;
   updated_at: string | null;
+  storage_path: string | null;
   original_filename: string | null;
   contract_start: string | null;
   term_months: number | null;
@@ -56,9 +57,19 @@ type ContractDetail = {
 async function readOptionalFields(
   supabase: Awaited<ReturnType<typeof createClient>>,
   id: string,
-): Promise<{ reminderOffsets: number[] | null; archivedAt: string | null }> {
-  for (const sel of ["reminder_offsets, archived_at", "reminder_offsets", ""]) {
-    if (!sel) return { reminderOffsets: null, archivedAt: null };
+): Promise<{
+  reminderOffsets: number[] | null;
+  archivedAt: string | null;
+  source: string;
+}> {
+  const empty = { reminderOffsets: null, archivedAt: null, source: "fiken" };
+  for (const sel of [
+    "reminder_offsets, archived_at, source",
+    "reminder_offsets, archived_at",
+    "reminder_offsets",
+    "",
+  ]) {
+    if (!sel) return empty;
     const { data, error } = await supabase
       .from("contract")
       .select(sel)
@@ -69,9 +80,10 @@ async function readOptionalFields(
     return {
       reminderOffsets: (row.reminder_offsets as number[] | null) ?? null,
       archivedAt: (row.archived_at as string | null) ?? null,
+      source: (row.source as string | null) ?? "fiken",
     };
   }
-  return { reminderOffsets: null, archivedAt: null };
+  return empty;
 }
 
 type Quote = { field: string; quote: string };
@@ -127,7 +139,7 @@ export default async function KontraktDetaljPage({
   const { data, error } = await supabase
     .from("contract")
     .select(
-      "id, status, updated_at, original_filename, contract_start, term_months, binding_until, auto_renews, renewal_date, notice_period_days, extraction_confidence, extraction_notes, extraction_error, needs_review, next_deadline, deadline_rolled_at, llm_model, llm_raw, supplier:supplier_id (name, organization_number)",
+      "id, status, updated_at, storage_path, original_filename, contract_start, term_months, binding_until, auto_renews, renewal_date, notice_period_days, extraction_confidence, extraction_notes, extraction_error, needs_review, next_deadline, deadline_rolled_at, llm_model, llm_raw, supplier:supplier_id (name, organization_number)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -142,9 +154,13 @@ export default async function KontraktDetaljPage({
   if (!data) notFound();
 
   const c = data as unknown as ContractDetail;
-  const { reminderOffsets: storedOffsets, archivedAt } =
-    await readOptionalFields(supabase, id);
+  const {
+    reminderOffsets: storedOffsets,
+    archivedAt,
+    source,
+  } = await readOptionalFields(supabase, id);
   const isArchived = archivedAt != null;
+  const isManual = source === "manual";
   const showForm =
     !isArchived && (c.status === "extracted" || c.status === "confirmed");
 
@@ -172,14 +188,20 @@ export default async function KontraktDetaljPage({
         {c.supplier?.organization_number
           ? `Org.nr ${c.supplier.organization_number} · `
           : ""}
-        <a
-          href={`/api/contracts/${c.id}/file`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-accent underline"
-        >
-          Åpne PDF{c.original_filename ? ` (${c.original_filename})` : ""}
-        </a>
+        {isManual ? "Lagt til manuelt" : "Fra Fiken"}
+        {c.storage_path ? (
+          <>
+            {" · "}
+            <a
+              href={`/api/contracts/${c.id}/file`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent underline"
+            >
+              Åpne PDF{c.original_filename ? ` (${c.original_filename})` : ""}
+            </a>
+          </>
+        ) : null}
       </p>
 
       {isArchived ? (

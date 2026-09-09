@@ -175,3 +175,17 @@ alter table public.contract
 -- historikk. NULL = aktiv.
 alter table public.contract
   add column if not exists archived_at timestamptz;
+
+-- Manuell kontraktsregistrering: avtaler som ikke går via Fiken.
+--   * supplier: en manuell leverandør har verken company_slug eller
+--     fiken_contact_id – begge blir nullbare. Unik-constrainten (user_id,
+--     company_slug, fiken_contact_id) tåler nulls (Postgres teller null som
+--     distinkt), så flere manuelle leverandører per bruker er greit.
+--   * contract.storage_path blir nullbar (PDF er valgfri referanse).
+--   * contract.source skiller 'fiken' fra 'manual'.
+alter table public.supplier alter column company_slug drop not null;
+alter table public.supplier alter column fiken_contact_id drop not null;
+alter table public.contract alter column storage_path drop not null;
+alter table public.contract
+  add column if not exists source text not null default 'fiken'
+    check (source in ('fiken', 'manual'));

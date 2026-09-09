@@ -37,6 +37,13 @@ export async function GET(
         { status: 404 },
       );
     }
+    if (!contract.storage_path) {
+      // Manuell kontrakt uten opplastet referanse-PDF.
+      return NextResponse.json(
+        { error: "Denne kontrakten har ingen PDF." },
+        { status: 404 },
+      );
+    }
 
     const signed = await supabase.storage
       .from("contracts")
