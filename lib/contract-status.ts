@@ -13,12 +13,25 @@ export type ContractStatus =
 
 export const STATUS_LABEL: Record<ContractStatus, string> = {
   draft: "Kladd",
-  uploaded: "Lastet opp",
+  uploaded: "Klar for tolkning",
   processing: "Leser kontrakten …",
-  extracted: "Tolket – til gjennomgang",
+  extracted: "Venter på bekreftelse",
   failed: "Tolkning feilet",
   confirmed: "Bekreftet",
 };
+
+/**
+ * Statuser der kontrakten IKKE er en aktiv, overvåket avtale ennå: den teller
+ * ikke i varslingslogikken (`lib/reminders.ts` krever `status = 'confirmed'`)
+ * og bør vises adskilt fra de bekreftede i UI-en.
+ */
+export const PENDING_STATUSES: ReadonlySet<ContractStatus> = new Set([
+  "draft",
+  "uploaded",
+  "processing",
+  "extracted",
+  "failed",
+]);
 
 /**
  * Hvor lenge en kontrakt får stå i `processing` før vi regner den som

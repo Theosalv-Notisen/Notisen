@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Alert } from "@/components/ui/alert";
 import { btnPrimary } from "@/components/ui/button-styles";
@@ -8,7 +8,9 @@ import { btnPrimary } from "@/components/ui/button-styles";
 /**
  * Knapper/poller for tolkningsflyten på detaljsiden.
  *
- * - "run"        : kontrakten er lastet opp, ikke tolket → "Kjør uttrekk"
+ * - "run"        : kontrakten er lastet opp, ikke tolket → tolkningen starter
+ *                  automatisk med én gang (knappen «Kjør uttrekk» er fallback
+ *                  hvis auto-starten feiler).
  * - "retry"      : forrige forsøk feilet → "Prøv igjen" (force=1)
  * - "processing" : tolkning pågår → oppdaterer siden med jevne mellomrom.
  *                  Gir opp etter ~5 min og viser "Prøv igjen" i stedet for
@@ -30,33 +32,9 @@ export function ExtractControls({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [gaveUp, setGaveUp] = useState(false);
-
-  useEffect(() => {
-    if (mode !== "processing" || gaveUp) return;
-    let polls = 0;
-    const timer = setInterval(() => {
-      polls += 1;
-      if (polls >= MAX_POLLS) {
-        setGaveUp(true);
-        clearInterval(timer);
-        return;
-      }
-      router.refresh();
-    }, POLL_MS);
-    return () => clearInterval(timer);
-  }, [mode, gaveUp, router]);
+  const autoStarted = useRef(false);
 
   const showStuck = mode === "stuck" || gaveUp;
-
-  // Fersk tolkning pågår – bare vis at siden oppdaterer seg selv.
-  if (mode === "processing" && !showStuck) {
-    return (
-      <p className="mt-4 text-sm text-ink-secondary">
-        Leser kontrakten … siden oppdaterer seg selv.
-      </p>
-    );
-  }
-
   // "retry" og "stuck"/ga-opp starter et nytt forsøk med force=1.
   const forceRetry = mode === "retry" || showStuck;
 
@@ -81,6 +59,40 @@ export function ExtractControls({
       setError("Nettverksfeil. Prøv igjen.");
       setBusy(false);
     }
+  }
+
+  // "run": start tolkningen automatisk rett etter opplasting, så brukeren
+  // lander på «leser kontrakten …» og deretter bekreft-skjemaet uten et
+  // ekstra klikk. Kjøres bare én gang; feiler den, står knappen igjen.
+  useEffect(() => {
+    if (mode !== "run" || autoStarted.current) return;
+    autoStarted.current = true;
+    void run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
+
+  useEffect(() => {
+    if (mode !== "processing" || gaveUp) return;
+    let polls = 0;
+    const timer = setInterval(() => {
+      polls += 1;
+      if (polls >= MAX_POLLS) {
+        setGaveUp(true);
+        clearInterval(timer);
+        return;
+      }
+      router.refresh();
+    }, POLL_MS);
+    return () => clearInterval(timer);
+  }, [mode, gaveUp, router]);
+
+  // Fersk tolkning pågår – bare vis at siden oppdaterer seg selv.
+  if (mode === "processing" && !showStuck) {
+    return (
+      <p className="mt-4 text-sm text-ink-secondary">
+        Leser kontrakten … siden oppdaterer seg selv.
+      </p>
+    );
   }
 
   return (
