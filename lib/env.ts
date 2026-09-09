@@ -45,6 +45,14 @@ export const env = {
   cronSecretOptional: () => optional("CRON_SECRET"),
 
   /**
+   * Upstash Redis for rate limiting (lib/rate-limit.ts). Valgfritt: mangler
+   * begge, er rate limiting deaktivert (alt slipper gjennom) – appen virker
+   * uansett. Sett opp via Vercel → Integrations → Upstash, eller manuelt.
+   */
+  upstashRedisUrl: () => optional("UPSTASH_REDIS_REST_URL"),
+  upstashRedisToken: () => optional("UPSTASH_REDIS_REST_TOKEN"),
+
+  /**
    * Nøkkel for kryptering av Fiken OAuth-tokens før de lagres i Supabase.
    * Nøyaktig 32 bytes, base64-kodet i miljøet. Generer med:
    *   openssl rand -base64 32

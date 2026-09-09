@@ -13,6 +13,7 @@ import { inputClass, labelClass } from "@/components/ui/field";
 const FEIL_TEKST: Record<string, string> = {
   ugyldig: "Feil e-post eller passord.",
   tomt: "Fyll ut både e-post og passord.",
+  rate: "For mange innloggingsforsøk. Vent noen minutter og prøv igjen.",
   reset_ugyldig:
     "Lenken for å tilbakestille passord var ugyldig eller utløpt. Be om en ny.",
 };

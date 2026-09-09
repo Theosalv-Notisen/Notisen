@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { rateLimit } from "@/lib/rate-limit";
 
 /**
  * Server actions for registrering, innlogging og utlogging.
@@ -67,6 +68,10 @@ export async function signUp(formData: FormData) {
     redirect(`/signup?feil=for-langt-passord&next=${encodeURIComponent(next)}`);
   }
 
+  if (!(await rateLimit("signup", email)).allowed) {
+    redirect(`/signup?feil=rate&next=${encodeURIComponent(next)}`);
+  }
+
   const supabase = await createClient();
   const { error } = await supabase.auth.signUp({ email, password });
 
@@ -84,6 +89,10 @@ export async function signIn(formData: FormData) {
 
   if (!email || !password) {
     redirect(`/login?feil=tomt&next=${encodeURIComponent(next)}`);
+  }
+
+  if (!(await rateLimit("login", email)).allowed) {
+    redirect(`/login?feil=rate&next=${encodeURIComponent(next)}`);
   }
 
   const supabase = await createClient();

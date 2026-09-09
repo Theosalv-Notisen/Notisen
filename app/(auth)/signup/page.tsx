@@ -16,6 +16,7 @@ const FEIL_TEKST: Record<string, string> = {
   "for-langt-passord": "Passordet er for langt. Maks 72 tegn.",
   "ugyldig-epost": "Ugyldig e-postadresse.",
   tomt: "Fyll ut både e-post og passord.",
+  rate: "For mange forsøk. Vent noen minutter og prøv igjen.",
 };
 
 export default async function SignupPage({

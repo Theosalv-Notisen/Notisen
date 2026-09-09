@@ -33,6 +33,12 @@ export default async function GlemtPassordPage({
         </Alert>
       ) : null}
 
+      {feil === "rate" ? (
+        <Alert variant="warning" className="mt-4">
+          For mange forsøk. Vent litt før du prøver igjen.
+        </Alert>
+      ) : null}
+
       {sendt ? (
         <Alert variant="good" className="mt-4">
           Hvis det finnes en konto på denne adressen, har vi sendt en e-post med

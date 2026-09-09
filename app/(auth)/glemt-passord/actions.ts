@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { env } from "@/lib/env";
+import { rateLimit } from "@/lib/rate-limit";
 
 /**
  * Ber Supabase sende en «tilbakestill passord»-e-post.
@@ -19,6 +20,12 @@ export async function sendPasswordReset(formData: FormData) {
 
   if (!email) {
     redirect("/glemt-passord?feil=tomt");
+  }
+
+  // «For mange forsøk» lekker ikke om e-posten finnes: per-e-post-grensen
+  // treffer uansett, og per-IP-grensen treffer etter noen ulike adresser.
+  if (!(await rateLimit("password-reset", email)).allowed) {
+    redirect("/glemt-passord?feil=rate");
   }
 
   const supabase = await createClient();
