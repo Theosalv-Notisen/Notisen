@@ -11,7 +11,7 @@ import { env } from "../env.ts";
  */
 
 /** Stier som krever innlogging. Alt annet er åpent. */
-const PROTECTED_PREFIXES = ["/dashboard", "/settings", "/kontrakter"];
+const PROTECTED_PREFIXES = ["/dashboard", "/settings", "/kontrakter", "/admin"];
 
 function isProtectedPath(pathname: string): boolean {
   return PROTECTED_PREFIXES.some(
