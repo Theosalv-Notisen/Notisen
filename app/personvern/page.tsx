@@ -103,10 +103,10 @@ export default function PersonvernPage() {
           <P>
             Kontakt:{" "}
             <a
-              href="mailto:theo1358@gmail.com"
+              href="mailto:kontakt@notisen.no"
               className="text-accent hover:text-accent-hover"
             >
-              theo1358@gmail.com
+              kontakt@notisen.no
             </a>
           </P>
 
@@ -287,10 +287,10 @@ export default function PersonvernPage() {
           <P>
             Ønsker du å bruke noen av disse rettighetene, kontakt oss på{" "}
             <a
-              href="mailto:theo1358@gmail.com"
+              href="mailto:kontakt@notisen.no"
               className="text-accent hover:text-accent-hover"
             >
-              theo1358@gmail.com
+              kontakt@notisen.no
             </a>
             .
           </P>
