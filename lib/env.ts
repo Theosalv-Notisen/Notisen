@@ -47,10 +47,19 @@ export const env = {
   /**
    * Upstash Redis for rate limiting (lib/rate-limit.ts). Valgfritt: mangler
    * begge, er rate limiting deaktivert (alt slipper gjennom) – appen virker
-   * uansett. Sett opp via Vercel → Integrations → Upstash, eller manuelt.
+   * uansett.
+   *
+   * Vercel sin Upstash-integrasjon navngir variablene ut fra prefikset du
+   * valgte, f.eks. `UPSTASH_REDIS_REST_KV_REST_API_URL`. Vi leser det navnet
+   * først, deretter standardnavnet `UPSTASH_REDIS_REST_URL`. NB: bruk skrive-
+   * tokenet (`..._REST_API_TOKEN`), ikke `..._READ_ONLY_TOKEN`.
    */
-  upstashRedisUrl: () => optional("UPSTASH_REDIS_REST_URL"),
-  upstashRedisToken: () => optional("UPSTASH_REDIS_REST_TOKEN"),
+  upstashRedisUrl: () =>
+    optional("UPSTASH_REDIS_REST_KV_REST_API_URL") ??
+    optional("UPSTASH_REDIS_REST_URL"),
+  upstashRedisToken: () =>
+    optional("UPSTASH_REDIS_REST_KV_REST_API_TOKEN") ??
+    optional("UPSTASH_REDIS_REST_TOKEN"),
 
   /**
    * Nøkkel for kryptering av Fiken OAuth-tokens før de lagres i Supabase.
