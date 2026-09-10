@@ -219,6 +219,14 @@ drop policy if exists "egen benchmark_consent" on public.benchmark_consent;
 create policy "egen benchmark_consent" on public.benchmark_consent
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+-- Tabell-grants. Supabase gir vanligvis disse automatisk via default privileges
+-- for `postgres`-rollen, men avhengig av HVEM som kjørte denne fila (SQL Editor
+-- vs. CLI vs. et annet verktøy) kan de mangle – da får appen «permission denied
+-- for table» (42501) selv om tabellen finnes. Eksplisitt grant er idempotent.
+-- RLS-policyene over er fortsatt det som avgrenser til egne rader.
+grant select, insert, update, delete on public.benchmark_consent to authenticated;
+grant all on public.benchmark_consent to service_role;
+
 -- Anonymiserte, kategoriserte pris-datapunkter. `user_id`/`supplier_id` lagres
 -- KUN for å kunne slette en brukers bidrag ved tilbaketrekking/kontosletting.
 -- Pseudonymisert i ro; anonymiseres først i (framtidig) aggregeringslag.
@@ -243,6 +251,9 @@ alter table public.benchmark_sample enable row level security;
 drop policy if exists "egen benchmark_sample" on public.benchmark_sample;
 create policy "egen benchmark_sample" on public.benchmark_sample
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+grant select, insert, update, delete on public.benchmark_sample to authenticated;
+grant all on public.benchmark_sample to service_role;
 
 -- ─────────────────────────────────────────────────────────────
 -- Opprydding i auth.audit_log_entries (GoTrue-innloggingslogg)

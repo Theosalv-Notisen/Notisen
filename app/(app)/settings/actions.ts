@@ -25,11 +25,16 @@ async function changeBenchmarkConsent(enabled: boolean) {
     // Supabase-feil er et vanlig objekt (ikke Error) – grav ut kode + melding.
     const e = err as { code?: string; message?: string } | null;
     const msg = e?.message ?? (err instanceof Error ? err.message : String(err));
-    const missingTable =
-      e?.code === "PGRST205" ||
-      e?.code === "42P01" ||
-      /benchmark_consent|benchmark_sample/.test(msg);
-    if (missingTable) {
+    const aboutBenchmark = /benchmark_consent|benchmark_sample/.test(msg);
+
+    // 42501 = permission denied: tabellen finnes, men mangler GRANT til
+    // `authenticated`/`service_role` (kan skje avhengig av hvem som kjørte
+    // migrasjonen). Egen melding – ellers ser det ut som migrasjonen ikke er kjørt.
+    if (e?.code === "42501" && aboutBenchmark) {
+      redirect("/settings?benchmark=tilgang");
+    }
+    // 42P01 / PGRST205 = tabellen finnes ikke.
+    if (e?.code === "PGRST205" || e?.code === "42P01" || aboutBenchmark) {
       redirect("/settings?benchmark=migrasjon");
     }
     throw err;

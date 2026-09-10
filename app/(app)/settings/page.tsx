@@ -80,7 +80,7 @@ export default async function SettingsPage({
     benchmark?: string;
   }>;
   // fiken: "connected" | "disconnected" | "disconnect_failed"
-  // benchmark: "pa" | "av" | "migrasjon"
+  // benchmark: "pa" | "av" | "migrasjon" | "tilgang"
 }) {
   const user = await requireUser("/settings");
   const { fiken, fiken_error, slett_feil, benchmark } = await searchParams;
@@ -183,6 +183,13 @@ export default async function SettingsPage({
         {benchmark === "migrasjon" ? (
           <Alert variant="critical" className="mt-3">
             Denne funksjonen krever en databaseoppdatering som ikke er kjørt ennå.
+          </Alert>
+        ) : null}
+        {benchmark === "tilgang" ? (
+          <Alert variant="critical" className="mt-3">
+            Tabellene finnes, men databaserollen mangler tilgang til dem. Kjør
+            GRANT-setningene for <code>benchmark_consent</code> og{" "}
+            <code>benchmark_sample</code> fra <code>supabase/schema.sql</code>.
           </Alert>
         ) : null}
 
