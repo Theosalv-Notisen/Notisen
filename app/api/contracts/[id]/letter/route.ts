@@ -133,6 +133,9 @@ export async function POST(
     const facts: LetterFacts = {
       supplierName: c.supplier?.name ?? "leverandøren",
       orgNumber: c.supplier?.organization_number ?? null,
+      // Ekstraheringen fanger ikke en ordrett tjenestebeskrivelse i dag – send
+      // null, så brevet holder seg til «avtalen med <leverandør>».
+      serviceDescription: null,
       noticePeriodDays: c.notice_period_days,
       bindingUntil: c.binding_until,
       renewalDate: c.renewal_date,

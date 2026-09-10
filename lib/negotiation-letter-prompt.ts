@@ -14,6 +14,12 @@ export type LetterKind = "cancellation" | "renegotiation";
 export type LetterFacts = {
   supplierName: string;
   orgNumber: string | null;
+  /**
+   * Hva tjenesten/produktet er – KUN hvis kontraktsteksten sier det eksplisitt.
+   * Ekstraheringen fanger ikke dette i dag, så den er som regel `null`; da skal
+   * brevet holde seg til «avtalen med [leverandør]» / «den aktuelle avtalen».
+   */
+  serviceDescription: string | null;
   noticePeriodDays: number | null;
   bindingUntil: string | null;
   renewalDate: string | null;
@@ -37,6 +43,11 @@ function nok(n: number): string {
 export function letterFactLines(facts: LetterFacts): string[] {
   const lines: string[] = [`Leverandør: ${facts.supplierName}`];
   if (facts.orgNumber) lines.push(`Organisasjonsnummer: ${facts.orgNumber}`);
+  if (facts.serviceDescription && facts.serviceDescription.trim()) {
+    lines.push(
+      `Hva avtalen gjelder (ordrett fra kontrakten): ${facts.serviceDescription.trim()}`,
+    );
+  }
   if (facts.noticePeriodDays != null) {
     lines.push(`Oppsigelsesfrist ifølge avtalen: ${facts.noticePeriodDays} dager`);
   }
@@ -68,6 +79,7 @@ export function letterFactLines(facts: LetterFacts): string[] {
 
 const SHARED_RULES = `Regler:
 - Bruk KUN opplysningene i faktalisten under. Ikke dikt opp tall, datoer, kundenummer, kontaktpersoner, juridiske paragrafer eller påstander om markedet/konkurrenter.
+- Ikke beskriv hva leverandørens tjeneste eller produkt er, med mindre faktalisten oppgir det eksplisitt under «Hva avtalen gjelder». Gjør den ikke det, skriv generisk: «avtalen med [leverandør]», «den aktuelle avtalen», «vår avtale med [leverandør]». Aldri gjett produktnavn, tjenestetype eller bransje.
 - Mangler noe brevet trenger (avsenders navn, adresse, kundenummer, konkret kontaktinfo): sett en tydelig plassholder i hakeparentes, f.eks. [ditt navn], [kundenummer].
 - Datér brevet med dagens dato som oppgis under. Ikke bruk en [dato]-plassholder for selve brevdatoen.
 - Skriv på norsk, i en høflig, saklig og profesjonell tone. Kort og konkret – ikke fyll.
@@ -94,7 +106,7 @@ export function buildLetterPrompt(
   facts: LetterFacts,
   today: string,
 ): { system: string; user: string } {
-  const system = `Du hjelper en norsk bedrift med å skrive et forretningsbrev til en av leverandørene sine for et regnskaps- og påminnelsesverktøy.\n\n${SHARED_RULES}`;
+  const system = `Du hjelper en norsk bedrift med å skrive et kort, saklig forretningsbrev til en av bedriftens leverandører.\n\n${SHARED_RULES}`;
 
   const user = [
     KIND_INSTRUCTION[kind],

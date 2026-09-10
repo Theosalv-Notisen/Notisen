@@ -25,6 +25,7 @@ function ws(s: string): string {
 const FULL: LetterFacts = {
   supplierName: "SkyCRM AS",
   orgNumber: "912345678",
+  serviceDescription: null,
   noticePeriodDays: 90,
   bindingUntil: "2026-12-31",
   renewalDate: "2027-01-01",
@@ -40,6 +41,7 @@ const FULL: LetterFacts = {
 const MINIMAL: LetterFacts = {
   supplierName: "Ukjent AS",
   orgNumber: null,
+  serviceDescription: null,
   noticePeriodDays: null,
   bindingUntil: null,
   renewalDate: null,
@@ -120,6 +122,59 @@ const MINIMAL: LetterFacts = {
   const c = buildLetterPrompt("cancellation", FULL, "2026-06-15").user;
   const r = buildLetterPrompt("renegotiation", FULL, "2026-06-15").user;
   check("de to brevtypene gir ulik instruks", c !== r);
+}
+
+// ── Ingen oppdiktet tjenestebeskrivelse ────────────────────────────
+// Regresjonsvern: prompten beskrev tidligere leverandøren som et
+// «regnskaps- og påminnelsesverktøy» (det er Notisen selv, ikke leverandøren) –
+// og modellen skrev det inn i brevet. Verken system- eller user-prompten skal
+// nevne en tjenestetype når faktalisten ikke oppgir en.
+for (const kind of ["cancellation", "renegotiation"] as const) {
+  const { system, user } = buildLetterPrompt(kind, FULL, "2026-06-15");
+  const both = (system + "\n" + user).toLowerCase();
+  check(
+    `${kind}: prompten nevner ikke «regnskaps- og påminnelsesverktøy»`,
+    !both.includes("påminnelsesverktøy") && !both.includes("regnskaps- og"),
+  );
+  check(
+    `${kind}: ingen oppfunnet tjenestetype (programvare/verktøy/system)`,
+    !/\b(programvare|verktøy|abonnement på|crm-system|regnskapssystem)\b/.test(
+      both,
+    ),
+  );
+  check(
+    `${kind}: system har regel om å ikke beskrive tjenesten`,
+    system.includes("Ikke beskriv hva leverandørens tjeneste"),
+  );
+}
+
+{
+  // Med eksplisitt tjenestebeskrivelse fra kontrakten → den SKAL være med,
+  // ordrett, og merket som fra kontrakten.
+  const withService: LetterFacts = {
+    ...MINIMAL,
+    serviceDescription: "drift og vedlikehold av kassasystem",
+  };
+  const lines = letterFactLines(withService).join("\n");
+  check(
+    "med tjenestebeskrivelse: tatt med ordrett",
+    lines.includes("drift og vedlikehold av kassasystem") &&
+      lines.includes("ordrett fra kontrakten"),
+  );
+  const { user } = buildLetterPrompt("cancellation", withService, "2026-06-15");
+  check(
+    "med tjenestebeskrivelse: havner i user-prompten",
+    user.includes("drift og vedlikehold av kassasystem"),
+  );
+}
+
+{
+  // Uten tjenestebeskrivelse → faktalisten sier ingenting om hva tjenesten er.
+  const lines = letterFactLines(MINIMAL).join("\n").toLowerCase();
+  check(
+    "uten tjenestebeskrivelse: faktalisten sier ikke hva avtalen gjelder",
+    !lines.includes("hva avtalen gjelder"),
+  );
 }
 
 console.log(failures === 0 ? "\nALLE TESTER OK" : `\n${failures} FEIL`);
